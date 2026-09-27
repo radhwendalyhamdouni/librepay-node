@@ -94,6 +94,35 @@ export default function DocsPage() {
         </section>
 
         <section className="space-y-3">
+          <h2 className="text-xl font-semibold">Connect WooCommerce (WordPress)</h2>
+          <ol className="list-decimal list-inside space-y-1.5 text-sm text-muted-foreground">
+            <li>
+              Download the plugin{" "}
+              <a href="/downloads/librepay-woocommerce.zip" download className="font-medium text-primary underline underline-offset-2">
+                librepay-woocommerce.zip
+              </a>{" "}
+              and in WordPress go to Plugins → Add New → Upload Plugin.
+            </li>
+            <li>WooCommerce → Settings → Payments → “Bitcoin via LibrePay” → Enable.</li>
+            <li>
+              Open the <a href="/setup" className="font-medium text-primary underline underline-offset-2">operator console</a> →
+              “Connect your store” and paste the base URL, API key and webhook secret into the plugin settings.
+            </li>
+            <li>
+              In the console → “Webhook destinations” add{" "}
+              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">https://YOUR-SITE.com/wc-api/librepay_webhook</code>{" "}
+              so the node notifies WooCommerce on every payment event.
+            </li>
+            <li>Place a test order — the order marks itself paid at the first confirmed block.</li>
+          </ol>
+          <p className="text-sm text-muted-foreground">
+            Any other stack (custom cart, Laravel, Django…) follows the same shape: create the invoice
+            server-side with the API, redirect the customer to <code className="rounded bg-muted px-1.5 py-0.5 text-xs">checkoutUrl</code>,
+            and flip the order to paid when the signed webhook arrives.
+          </p>
+        </section>
+
+        <section className="space-y-3">
           <h2 className="text-xl font-semibold">Status lifecycle</h2>
           <pre className="rounded-lg bg-muted p-4 text-xs overflow-x-auto">{`waiting ──(tx seen)──▶ detected ──(≥ N conf)──▶ confirmed ──(≥ 6 conf)──▶ settled
    └──(expiry)──▶ expired        underpaid (beyond 1% tolerance)`}</pre>

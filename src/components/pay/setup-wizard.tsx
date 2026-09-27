@@ -88,6 +88,43 @@ const T = {
     modeNone: "not configured",
     encrypted: "encrypted",
     plain: "no passphrase",
+    walletTitle: "Your wallet",
+    walletExplain:
+      "Watch-only — the node sees payments but can never spend. Every invoice derives a fresh address from YOUR key, and funds land directly in your wallet. To spend, use Sparrow, Electrum or BlueWallet — the node deliberately has no send button.",
+    walletLastAddr: "Latest derived address",
+    walletDerivations: "Addresses derived",
+    walletZpubHelp: "Where is my zpub? Sparrow → Wallet → Information · Electrum → Wallet → Information · BlueWallet → wallet → ⋯ → Show xpub.",
+    walletCold: "No wallet yet? Generate a cold one in your browser — works offline.",
+    coldTool: "Cold Wallet generator",
+    connectTitle: "Connect your store",
+    connectIntro: "Three values and your shop accepts Bitcoin. Works with WooCommerce, any custom cart, or a plain curl.",
+    connectBase: "1 · Node API base URL",
+    connectKey: "2 · API key",
+    connectKeyNote: "The same lp_live_… key you unlocked with. The node stores only its hash — keep a copy in your password manager.",
+    connectHook: "3 · Webhook secret",
+    connectHookNote: "Your store uses it to verify signed payment events (HMAC-SHA256). Never share it.",
+    reveal: "reveal",
+    hide: "hide",
+    copy: "copy",
+    copied: "copied ✓",
+    hookUrls: "Webhook destinations — URLs on YOUR store that receive signed events",
+    hookAdd: "https://your-store.com/wc-api/librepay_webhook",
+    hookSave: "Save destinations",
+    hookEmpty: "No destinations yet — add your store's webhook URL below.",
+    wooTitle: "WooCommerce (WordPress)",
+    wooStep1: "Download the plugin, then in WordPress: Plugins → Add New → Upload Plugin.",
+    wooStep2: "WooCommerce → Settings → Payments → “Bitcoin via LibrePay” → Enable.",
+    wooStep3: "Paste the base URL, API key and webhook secret from above.",
+    wooStep4: "Add your store's webhook URL in “Webhook destinations” below so the node can notify WooCommerce.",
+    wooStep5: "Place a test order — the order marks itself paid on the first confirmed block.",
+    downloadPlugin: "⇩ Download WooCommerce plugin (.zip)",
+    curlTitle: "Or create invoices from your own code",
+    invoicesTitle: "Recent invoices",
+    invoicesEmpty: "No invoices yet — create the first one from your store or with the curl above.",
+    invOrder: "Order",
+    invAmount: "Amount",
+    invStatus: "Status",
+    openCheckout: "checkout ↗",
   },
   ar: {
     title: "LibrePay Node",
@@ -157,6 +194,43 @@ const T = {
     modeNone: "غير مضبوطة",
     encrypted: "مشفّرة",
     plain: "بدون عبارة تشفير",
+    walletTitle: "محفظتك",
+    walletExplain:
+      "مراقِبة فقط — العقدة ترى الدفعات ولا تستطيع الإنفاق أبداً. كل فاتورة تُشتق عنواناً جديداً من مفتاحك أنت، والأموال تهبط مباشرة في محفظتك. للإنفاق استخدم Sparrow أو Electrum أو BlueWallet — العقدة بلا زر إرسال عمداً.",
+    walletLastAddr: "أحدث عنوان مُشتق",
+    walletDerivations: "عناوين مُشتقة",
+    walletZpubHelp: "أين أجد zpub؟ Sparrow → Wallet → Information · Electrum → Wallet → Information · BlueWallet → المحفظة → ⋯ → Show xpub.",
+    walletCold: "لا تملك محفظة بعد؟ ولّد واحدة باردة في متصفحك — تعمل دون اتصال.",
+    coldTool: "مولّد المحفظة الباردة",
+    connectTitle: "اربط متجرك",
+    connectIntro: "ثلاث قيم ويقبل متجرك البيتكوين. يعمل مع ووكومرس وأي سلة مخصصة أو حتى سطر أوامر واحد.",
+    connectBase: "1 · عنوان العقدة الأساسي",
+    connectKey: "2 · مفتاح API",
+    connectKeyNote: "نفس مفتاح lp_live_… الذي فتحت به الكونسول. العقدة تحفظ بصمة sha256 فقط — احفظ نسخة في مدير كلمات المرور.",
+    connectHook: "3 · سرّ الويبهوك",
+    connectHookNote: "يستخدمه متجرك للتحقق من أحداث الدفع الموقّعة (HMAC-SHA256). لا تشاركه أبداً.",
+    reveal: "إظهار",
+    hide: "إخفاء",
+    copy: "نسخ",
+    copied: "نُسخ ✓",
+    hookUrls: "وجهات الويبهوك — روابط على متجرك تستقبل الأحداث الموقّعة",
+    hookAdd: "https://your-store.com/wc-api/librepay_webhook",
+    hookSave: "حفظ الوجهات",
+    hookEmpty: "لا وجهات بعد — أضف رابط ويبهوك متجرك أدناه.",
+    wooTitle: "ووكومرس (ووردبريس)",
+    wooStep1: "حمّل الإضافة ثم في ووردبريس: إضافات → أضف جديد → ارفع الإضافة.",
+    wooStep2: "ووكومرس → الإعدادات → الدفعات ← «Bitcoin via LibrePay» ← تمكين.",
+    wooStep3: "الصق عنوان العقدة ومفتاح API وسرّ الويبهوك من الأعلى.",
+    wooStep4: "أضف رابط ويبهوك متجرك في «وجهات الويبهوك» أدناه لتصلك إشعارات الدفع.",
+    wooStep5: "أنشئ طلباً تجريبياً — يُعلَّم مدفوعاً تلقائياً عند أول تأكيد على السلسلة.",
+    downloadPlugin: "⇩ تحميل إضافة ووكومرس (.zip)",
+    curlTitle: "أو أنشئ الفواتير من كودك مباشرة",
+    invoicesTitle: "أحدث الفواتير",
+    invoicesEmpty: "لا فواتير بعد — أنشئ الأولى من متجرك أو بأمر curl أعلاه.",
+    invOrder: "الطلب",
+    invAmount: "المبلغ",
+    invStatus: "الحالة",
+    openCheckout: "صفحة الدفع ↗",
   },
 } as const;
 
@@ -165,8 +239,18 @@ interface StatusPayload {
 }
 interface SystemStatus {
   store: { name: string; brandColor: string };
-  wallet: { mode: string; confirmationsRequired: number; invoiceExpiryMinutes: number; lightning: string };
+  wallet: { mode: string; confirmationsRequired: number; invoiceExpiryMinutes: number; lightning: string; lastAddress: string | null; derivations: number };
   counts: { invoices: number; paid: number };
+  webhooks: { urls: string[]; secrets: string[] };
+  recentInvoices: {
+    id: string;
+    orderId: string | null;
+    amountSats: string;
+    fiatAmountCents: number | null;
+    fiatCurrency: string | null;
+    status: string;
+    createdAt: string;
+  }[];
   backup: {
     lastBackupAt: string | null;
     lastRemotePushAt: string | null;
@@ -218,6 +302,18 @@ export default function SetupWizard() {
   const [stagedHint, setStagedHint] = useState<string | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // merchant-journey state (wallet / connect / invoices)
+  const [revealKey, setRevealKey] = useState(false);
+  const [revealSecret, setRevealSecret] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [hookList, setHookList] = useState<string[]>([]);
+  const [newHook, setNewHook] = useState("");
+
+  function copyText(id: string, value: string) {
+    void navigator.clipboard.writeText(value);
+    setCopied(id);
+    setTimeout(() => setCopied((c) => (c === id ? null : c)), 1500);
+  }
 
   useEffect(() => {
     setBaseUrl(window.location.origin);
@@ -236,6 +332,7 @@ export default function SetupWizard() {
       }
       const data = (await r.json()) as SystemStatus;
       setSys(data);
+      setHookList(data.webhooks?.urls ?? []);
       const bl = await fetch("/api/system/backup", { headers: { Authorization: `Bearer ${key}` } });
       const bd = await bl.json();
       setBackups(bd.backups ?? []);
@@ -360,12 +457,33 @@ export default function SetupWizard() {
     setBusy(false);
   }
 
+  async function saveHooks() {
+    setBusy(true);
+    await fetch("/api/system/webhooks", {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ urls: hookList }),
+    });
+    await loadManage(apiKey);
+    setBusy(false);
+  }
+
   // ── shared bits ───────────────────────────────────────────────────────────
   const Card = ({ children }: { children: React.ReactNode }) => (
     <div className="w-full max-w-xl rounded-2xl border bg-card p-6 sm:p-8 shadow-lg">
       {children}
     </div>
   );
+  const statusPill = (s: string) =>
+    s === "settled" || s === "confirmed"
+      ? "border-green-500/30 bg-green-500/10 text-green-600"
+      : s === "detected"
+        ? "border-blue-500/30 bg-blue-500/10 text-blue-600"
+        : s === "expired"
+          ? "border-red-500/30 bg-red-500/10 text-red-600"
+          : s === "underpaid"
+            ? "border-amber-500/30 bg-amber-500/10 text-amber-600"
+            : "border-border bg-muted text-muted-foreground";
   const label = "mb-1.5 block text-sm font-medium text-foreground";
   const input =
     "w-full rounded-md border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring";
@@ -468,6 +586,152 @@ export default function SetupWizard() {
                   <div className="rounded-lg border p-3"><div className="text-muted-foreground">{t.invoices}</div><div className="font-semibold">{sys.counts.invoices}</div></div>
                   <div className="rounded-lg border p-3"><div className="text-muted-foreground">{t.paid}</div><div className="font-semibold">{sys.counts.paid}</div></div>
                 </div>
+              </Card>
+
+              {/* ── WALLET ─────────────────────────────────────────────── */}
+              <Card>
+                <h2 className="text-lg font-bold mb-2">👛 {t.walletTitle}</h2>
+                <p className="text-sm text-muted-foreground mb-3">{t.walletExplain}</p>
+                <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+                  <div className="rounded-lg border p-3">
+                    <div className="text-muted-foreground">{t.walletMode}</div>
+                    <div className="font-semibold">{sys.wallet.mode === "watchonly" ? t.modeWatchonly : sys.wallet.mode === "selfcustody" ? t.modeSelfcustody : t.modeNone}</div>
+                  </div>
+                  <div className="rounded-lg border p-3">
+                    <div className="text-muted-foreground">{t.walletDerivations}</div>
+                    <div className="font-semibold">{sys.wallet.derivations}</div>
+                  </div>
+                </div>
+                {sys.wallet.lastAddress && (
+                  <div className="mb-4">
+                    <span className={label}>{t.walletLastAddr}</span>
+                    <div className="flex gap-2">
+                      <code dir="ltr" className="flex-1 rounded-md border bg-muted px-3 py-2 text-xs font-mono break-all">{sys.wallet.lastAddress}</code>
+                      <button className="rounded-md border px-3 text-xs hover:bg-muted shrink-0" onClick={() => copyText("addr", sys.wallet.lastAddress ?? "")}>{copied === "addr" ? t.copied : t.copy}</button>
+                    </div>
+                  </div>
+                )}
+                {sys.wallet.mode === "watchonly" && <p className="text-xs text-muted-foreground mb-2">{t.walletZpubHelp}</p>}
+                <p className="text-xs text-muted-foreground">
+                  {t.walletCold}{" "}
+                  <Link href={`/cold?lang=${lang}`} className="font-medium text-primary underline underline-offset-2">{t.coldTool}</Link>
+                </p>
+              </Card>
+
+              {/* ── CONNECT YOUR STORE ─────────────────────────────────── */}
+              <Card>
+                <h2 className="text-lg font-bold mb-1">🔗 {t.connectTitle}</h2>
+                <p className="text-sm text-muted-foreground mb-4">{t.connectIntro}</p>
+
+                <span className={label}>{t.connectBase}</span>
+                <div className="flex gap-2 mb-4">
+                  <code dir="ltr" className="flex-1 rounded-md border bg-muted px-3 py-2 text-xs font-mono break-all">{baseUrl}</code>
+                  <button className="rounded-md border px-3 text-xs hover:bg-muted shrink-0" onClick={() => copyText("base", baseUrl)}>{copied === "base" ? t.copied : t.copy}</button>
+                </div>
+
+                <span className={label}>{t.connectKey}</span>
+                <div className="flex gap-2 mb-1">
+                  <code dir="ltr" className="flex-1 rounded-md border bg-muted px-3 py-2 text-xs font-mono break-all">
+                    {apiKey ? (revealKey ? apiKey : `${apiKey.slice(0, 12)}…${apiKey.slice(-4)}`) : "lp_live_…"}
+                  </code>
+                  <button className="rounded-md border px-3 text-xs hover:bg-muted shrink-0" onClick={() => setRevealKey((v) => !v)}>{revealKey ? t.hide : t.reveal}</button>
+                  {apiKey && (
+                    <button className="rounded-md border px-3 text-xs hover:bg-muted shrink-0" onClick={() => copyText("key", apiKey)}>{copied === "key" ? t.copied : t.copy}</button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mb-4">{t.connectKeyNote}</p>
+
+                {sys.webhooks.secrets.length > 0 && (
+                  <>
+                    <span className={label}>{t.connectHook}</span>
+                    <div className="flex gap-2 mb-1">
+                      <code dir="ltr" className="flex-1 rounded-md border bg-muted px-3 py-2 text-xs font-mono break-all">
+                        {revealSecret ? sys.webhooks.secrets[0] : `${sys.webhooks.secrets[0].slice(0, 8)}••••••••`}
+                      </code>
+                      <button className="rounded-md border px-3 text-xs hover:bg-muted shrink-0" onClick={() => setRevealSecret((v) => !v)}>{revealSecret ? t.hide : t.reveal}</button>
+                      <button className="rounded-md border px-3 text-xs hover:bg-muted shrink-0" onClick={() => copyText("hook", sys.webhooks.secrets[0])}>{copied === "hook" ? t.copied : t.copy}</button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-4">{t.connectHookNote}</p>
+                  </>
+                )}
+
+                <span className={label}>{t.hookUrls}</span>
+                {hookList.length === 0 && <p className="text-xs text-muted-foreground mb-2">{t.hookEmpty}</p>}
+                <ul className="space-y-1.5 mb-2">
+                  {hookList.map((u) => (
+                    <li key={u} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                      <span dir="ltr" className="truncate font-mono text-xs">{u}</span>
+                      <button className="rounded border px-2 py-0.5 text-xs hover:bg-muted shrink-0" disabled={busy} onClick={() => setHookList(hookList.filter((x) => x !== u))}>✕</button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    dir="ltr"
+                    className={`${input} font-mono text-xs`}
+                    placeholder={t.hookAdd}
+                    value={newHook}
+                    onChange={(e) => setNewHook(e.target.value)}
+                  />
+                  <button
+                    className="rounded-md border px-3 text-sm hover:bg-muted shrink-0"
+                    disabled={busy || !newHook.trim()}
+                    onClick={() => { setHookList([...hookList, newHook.trim()]); setNewHook(""); }}
+                  >+</button>
+                </div>
+                <button className="mb-5 rounded-md border px-3 py-1.5 text-xs hover:bg-muted" disabled={busy} onClick={saveHooks}>{t.hookSave}</button>
+
+                <div className="rounded-lg border p-4 mb-4">
+                  <h3 className="font-semibold text-sm mb-2">🛒 {t.wooTitle}</h3>
+                  <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+                    <li>{t.wooStep1}</li>
+                    <li>{t.wooStep2}</li>
+                    <li>{t.wooStep3}</li>
+                    <li>{t.wooStep4}</li>
+                    <li>{t.wooStep5}</li>
+                  </ol>
+                  <a
+                    href="/downloads/librepay-woocommerce.zip"
+                    download
+                    className="mt-3 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                  >
+                    {t.downloadPlugin}
+                  </a>
+                </div>
+
+                <span className={label}>{t.curlTitle}</span>
+                <pre dir="ltr" className="overflow-x-auto whitespace-pre rounded-md border bg-muted px-3 py-2 text-xs font-mono">{`curl -X POST ${baseUrl}/api/v1/invoices \\
+  -H "Authorization: Bearer ${revealKey && apiKey ? apiKey : "lp_live_YOUR_KEY"}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"amountFiat": 9.99, "currency": "USD", "orderId": "order-123"}'`}</pre>
+              </Card>
+
+              {/* ── RECENT INVOICES ────────────────────────────────────── */}
+              <Card>
+                <h2 className="text-lg font-bold mb-3">🧾 {t.invoicesTitle}</h2>
+                {sys.recentInvoices.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t.invoicesEmpty}</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {sys.recentInvoices.map((inv) => (
+                      <li key={inv.id} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm">
+                        <div className="min-w-0">
+                          <div className="font-medium truncate">{inv.orderId || inv.id}</div>
+                          <div className="text-xs text-muted-foreground">{new Date(inv.createdAt).toLocaleString()}</div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <div dir="ltr" className="font-mono text-xs font-semibold">
+                            {inv.amountSats} sats{inv.fiatAmountCents ? ` · $${(inv.fiatAmountCents / 100).toFixed(2)}` : ""}
+                          </div>
+                          <div className="mt-0.5 flex items-center justify-end gap-2">
+                            <span className={`rounded-full border px-2 py-0.5 text-xs ${statusPill(inv.status)}`}>{inv.status}</span>
+                            <a href={`/pay/${inv.id}`} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline underline-offset-2">{t.openCheckout}</a>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </Card>
 
               <Card>
