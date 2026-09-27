@@ -35,6 +35,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import { env, walletConfigured as envWalletConfigured } from "@/lib/env";
+import { decryptServerSecret } from "@/lib/server/crypto-server";
 
 export interface BackupSettings {
   enabled: boolean;
@@ -42,7 +43,8 @@ export interface BackupSettings {
   retain: number; // keep last N archives on this server
   remoteTarget: string; // "user@host:/path" (scp/rsync over SSH) or ""
   remotePort: number; // ssh port for the remote target
-  passphrase: string; // AES-256-GCM at-rest encryption for archives ("" = off)
+  passphrase: string; // LEGACY plaintext (pre-v0.4 configs) — new writes use passphraseEnc
+  passphraseEnc: string | null; // AES-256-GCM blob (encryptServerSecret) — encrypted at rest
 }
 
 export interface Settings {
@@ -59,7 +61,12 @@ export interface Settings {
   apiKeyHash: string | null; // sha256 of the raw lp_live_ key (never the raw)
   webhookUrls: string[];
   webhookSecrets: string[];
-  lightning: { url: string | null; password: string | null };
+  /** Privacy posture chosen in the console:
+   *  standard  — convenience first (Lightning first when available)
+   *  balanced  — default: on-chain stealth rail + Lightning for small fast amounts
+   *  maximum   — on-chain stealth/payment-code ONLY; Lightning off; everything self-hosted */
+  privacyMode: "standard" | "balanced" | "maximum";
+  lightning: { url: string | null; password: string | null; passwordEnc: string | null };
   backup: BackupSettings;
   createdAt: string;
   updatedAt: string;
@@ -92,7 +99,8 @@ function defaults(): Settings {
     apiKeyHash: env.API_KEY ? createHash("sha256").update(env.API_KEY).digest("hex") : null,
     webhookUrls: env.WEBHOOK_URLS,
     webhookSecrets: env.WEBHOOK_SECRETS,
-    lightning: { url: env.LIGHTNING_URL, password: env.LIGHTNING_PASSWORD },
+    privacyMode: "balanced",
+    lightning: { url: env.LIGHTNING_URL, password: env.LIGHTNING_PASSWORD, passwordEnc: null },
     backup: {
       enabled: true,
       intervalHours: 24,
@@ -100,6 +108,7 @@ function defaults(): Settings {
       remoteTarget: "",
       remotePort: 22,
       passphrase: "",
+      passphraseEnc: null,
     },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -130,6 +139,31 @@ export function getSettings(): Settings {
   };
   cache = { mtimeMs: mtime, value: merged };
   return merged;
+}
+
+/** Decrypted backup passphrase — passwordEnc wins, legacy plaintext tolerated for migration. */
+export function resolveBackupPassphrase(s: Settings): string {
+  if (s.backup.passphraseEnc) {
+    try {
+      return decryptServerSecret(s.backup.passphraseEnc);
+    } catch {
+      // key rotated / blob corrupted — fall through to legacy value
+    }
+  }
+  return s.backup.passphrase ?? "";
+}
+
+/** Decrypted phoenixd password — env wins, then encrypted blob, then legacy plaintext. */
+export function resolveLightningPassword(s: Settings): string | null {
+  if (env.LIGHTNING_PASSWORD) return env.LIGHTNING_PASSWORD;
+  if (s.lightning.passwordEnc) {
+    try {
+      return decryptServerSecret(s.lightning.passwordEnc);
+    } catch {
+      return null;
+    }
+  }
+  return s.lightning.password ?? null;
 }
 
 /** Atomic write (tmp + rename) so a crash can never half-write config. */

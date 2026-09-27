@@ -12,6 +12,7 @@ import { phoenixdCreateInvoice, lightningPasswordOf, PhoenixdError } from "./lig
 import type { MerchantConfig } from "@/lib/config";
 import { env } from "@/lib/env";
 import { detectLang } from "@/lib/i18n";
+import { getSettings } from "@/lib/server/settings";
 
 /** live rate if reachable, otherwise static fallback (checkout must keep working) */
 async function rateFor(currency: string): Promise<number | null> {
@@ -135,7 +136,13 @@ export async function createInvoiceForMerchant(
   // connected we also mint a bolt11 from it, tagged with our invoice id as
   // externalId. A node failure must NEVER block invoice creation — degrade
   // gracefully to on-chain-only.
-  if (merchant.lightningUrl && merchant.lightningStatus === "ok") {
+  // Privacy posture: in "maximum" mode Lightning is deliberately OFF —
+  // every invoice rides the on-chain stealth rail only.
+  if (
+    getSettings().privacyMode !== "maximum" &&
+    merchant.lightningUrl &&
+    merchant.lightningStatus === "ok"
+  ) {
     const password = lightningPasswordOf(merchant);
     if (password) {
       try {

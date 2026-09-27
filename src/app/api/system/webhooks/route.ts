@@ -16,6 +16,7 @@ import { authenticateApiKey } from "@/lib/server/api-auth";
 import { getSettings, saveSettings } from "@/lib/server/settings";
 import { assertOutboundUrl } from "@/lib/server/ssrf-guard";
 import { env } from "@/lib/env";
+import { logSecurityEvent, SecurityEventType } from "@/lib/server/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -57,5 +58,11 @@ export async function PUT(req: Request) {
   }
 
   saveSettings({ webhookUrls: cleaned });
+  logSecurityEvent({
+    type: SecurityEventType.WEBHOOKS_UPDATED,
+    severity: "info",
+    req,
+    detail: `webhook destinations set (${cleaned.length})`,
+  });
   return NextResponse.json({ ok: true, urls: cleaned });
 }

@@ -14,6 +14,7 @@
 import { createHmac } from "node:crypto";
 import { guardOutboundUrl } from "./ssrf-guard";
 import { decryptServerSecret, appSecret } from "./crypto-server";
+import { getSettings } from "@/lib/server/settings";
 import { env } from "@/lib/env";
 
 export interface PhoenixdInvoice {
@@ -173,14 +174,17 @@ export async function phoenixdRegisterWebhook(
 // ---------------------------------------------------------------------------
 
 export function lightningPasswordOf(merchant: { lightningPasswordEnc: string | null }): string | null {
-  // Node edition: the operator's phoenixd password lives in .env — env wins.
+  // env wins (operator-managed file), then the encrypted-at-rest blob, then legacy plaintext
   if (env.LIGHTNING_PASSWORD) return env.LIGHTNING_PASSWORD;
-  if (!merchant.lightningPasswordEnc) return null;
-  try {
-    return decryptServerSecret(merchant.lightningPasswordEnc);
-  } catch {
-    return null;
+  const s = getSettings();
+  if (s.lightning.passwordEnc) {
+    try {
+      return decryptServerSecret(s.lightning.passwordEnc);
+    } catch {
+      return null;
+    }
   }
+  return s.lightning.password ?? null;
 }
 
 export function lightningWebhookUrl(appOrigin: string, merchantId: string, token: string): string {

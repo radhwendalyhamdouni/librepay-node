@@ -39,7 +39,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { db } from "@/lib/db";
-import { dataDirPath, getSettings } from "@/lib/server/settings";
+import { dataDirPath, getSettings, resolveBackupPassphrase } from "@/lib/server/settings";
 
 const MAGIC = "LPLBACKUP1";
 const ARCHIVE_RE = /^[A-Za-z0-9._-]+\.lplbackup$/;
@@ -106,7 +106,7 @@ export async function createBackup(reason: "manual" | "scheduled" | "pre-restore
       app: "librepay-node",
       createdAt: new Date().toISOString(),
       reason,
-      encrypted: !!settings.backup.passphrase,
+      encrypted: !!resolveBackupPassphrase(settings),
       includesEnv: existsSync(envPath),
     },
     config: JSON.parse(configContent),
@@ -118,10 +118,10 @@ export async function createBackup(reason: "manual" | "scheduled" | "pre-restore
   const gz = gzipSync(Buffer.from(JSON.stringify(payload)));
 
   let out = gz;
-  if (settings.backup.passphrase) {
+  if (resolveBackupPassphrase(settings)) {
     const salt = randomBytes(16);
     const iv = randomBytes(12);
-    const cipher = createCipheriv("aes-256-gcm", deriveKey(settings.backup.passphrase, salt), iv);
+    const cipher = createCipheriv("aes-256-gcm", deriveKey(resolveBackupPassphrase(settings), salt), iv);
     const enc = Buffer.concat([cipher.update(gz), cipher.final()]);
     out = Buffer.concat([Buffer.from("ENCV1"), salt, iv, cipher.getAuthTag(), enc]);
   }
@@ -140,7 +140,7 @@ export async function createBackup(reason: "manual" | "scheduled" | "pre-restore
   state.lastBackupAt = payload.meta.createdAt;
   writeState(state);
 
-  return { name, bytes: out.length, encrypted: !!settings.backup.passphrase };
+  return { name, bytes: out.length, encrypted: !!resolveBackupPassphrase(settings) };
 }
 
 export function listBackups(): { name: string; bytes: number; mtime: string }[] {
@@ -158,7 +158,7 @@ export function listBackups(): { name: string; bytes: number; mtime: string }[] 
 function decodeArchive(buf: Buffer): ReturnType<typeof JSON.parse> {
   let gz: Buffer;
   if (buf.subarray(0, 5).toString() === "ENCV1") {
-    const passphrase = getSettings().backup.passphrase;
+    const passphrase = resolveBackupPassphrase(getSettings());
     if (!passphrase) throw new Error("archive is encrypted but no backup passphrase is configured");
     const salt = buf.subarray(5, 21);
     const iv = buf.subarray(21, 33);
@@ -281,7 +281,7 @@ export function backupStatus(): BackupState & { count: number; totalBytes: numbe
     ...state,
     count: all.length,
     totalBytes: all.reduce((n, b) => n + b.bytes, 0),
-    encrypted: !!getSettings().backup.passphrase,
+    encrypted: !!resolveBackupPassphrase(getSettings()),
   };
 }
 

@@ -125,6 +125,43 @@ const T = {
     invAmount: "Amount",
     invStatus: "Status",
     openCheckout: "checkout ↗",
+    // badges — every function labeled honestly
+    badgeRequired: "required",
+    badgeOptional: "optional",
+    badgeRecommended: "recommended",
+    // privacy modes
+    privacyTitle: "Privacy mode",
+    privacyIntro: "Choose how your money moves. Change it anytime — the on-chain stealth rail is ALWAYS on.",
+    privacyStandard: "Standard",
+    privacyStandardDesc: "Convenience first — Lightning pays instantly when connected; on-chain stealth otherwise.",
+    privacyBalanced: "Balanced",
+    privacyBalancedDesc: "Recommended — on-chain stealth always; Lightning helps for small fast amounts.",
+    privacyMaximum: "Maximum privacy",
+    privacyMaximumDesc: "On-chain stealth / payment-code ONLY. Lightning fully disabled. Nothing but public keys ever leaves your server.",
+    privacyNow: "current",
+    // lightning management
+    lnTitle: "Lightning (optional)",
+    lnIntro: "Instant settlement for small amounts via YOUR own phoenixd. The node works fully without it. In Maximum-privacy mode it is ignored.",
+    lnUrl: "phoenixd URL",
+    lnPassword: "phoenixd http-password",
+    lnConnect: "Connect & test",
+    lnConnected: "Connected ✓",
+    lnDisconnected: "Not connected — on-chain only",
+    lnNote: "Tested live before saving · password stored encrypted (AES-256-GCM) · keep the channel balance small — big invoices stay on-chain.",
+    lnDisconnect: "Disconnect",
+    // security
+    secTitle: "Security & monitoring",
+    secEnc: "Encryption at rest",
+    secMonitor: "Live monitor",
+    secAuto: "auto-refresh 15s",
+    secEncryptNow: "Encrypt secrets now",
+    secPurge: "Clear log",
+    secAlert: "Multiple failed unlock attempts in the last 24h. If this isn't you, rotate the API key NOW.",
+    secChecklist: "Server hardening checklist",
+    secEvents24: "24h:",
+    secFailed: "failed unlocks",
+    secThrottled: "throttled",
+    secBlocked: "SSRF blocked",
   },
   ar: {
     title: "LibrePay Node",
@@ -231,11 +268,62 @@ const T = {
     invAmount: "المبلغ",
     invStatus: "الحالة",
     openCheckout: "صفحة الدفع ↗",
+    // الشارات — كل وظيفة موسومة بصدق
+    badgeRequired: "مطلوب",
+    badgeOptional: "اختياري",
+    badgeRecommended: "مستحسن",
+    // مستويات الخصوصية
+    privacyTitle: "مستوى الخصوصية",
+    privacyIntro: "اختر كيف تتحرك أموالك. غيّره متى شئت — سكة الستيلث على السلسلة تعمل دائماً.",
+    privacyStandard: "عادي",
+    privacyStandardDesc: "الراحة أولاً — لايتنينغ يدفع فوراً عند الاتصال، وإلا ستيلث على السلسلة.",
+    privacyBalanced: "متوازن",
+    privacyBalancedDesc: "مستحسن — ستيلث على السلسلة دائماً؛ ولايتنينغ يساعد للمبالغ الصغيرة السريعة.",
+    privacyMaximum: "خصوصية فائقة",
+    privacyMaximumDesc: "ستيلث/رمز الدفع على السلسلة فقط. لايتنينغ معطّل كلياً. لا يخرج من سيرفرك سوى المفاتيح العامة.",
+    privacyNow: "الحالي",
+    // إدارة لايتنينغ
+    lnTitle: "لايتنينغ (اختياري)",
+    lnIntro: "تسوية فورية للمبالغ الصغيرة عبر phoenixd الخاص بك. العقدة تعمل كاملة بدونه. ويُتجاهل في وضع الخصوصية الفائقة.",
+    lnUrl: "رابط phoenixd",
+    lnPassword: "كلمة http-password لـ phoenixd",
+    lnConnect: "ربط واختبار",
+    lnConnected: "متصل ✓",
+    lnDisconnected: "غير متصل — السلسلة فقط",
+    lnNote: "يُختبر مباشرة قبل الحفظ · كلمة السر تُخزن مشفرة (AES-256-GCM) · أبقِ رصيد القناة صغيراً — الفواتير الكبيرة تبقى على السلسلة.",
+    lnDisconnect: "فصل",
+    // الأمان
+    secTitle: "الأمان والمراقبة",
+    secEnc: "التشفير في التخزين",
+    secMonitor: "المراقب الحي",
+    secAuto: "تحديث تلقائي كل 15 ثانية",
+    secEncryptNow: "شفّر الأسرار الآن",
+    secPurge: "تفريغ السجل",
+    secAlert: "محاولات فتح فاشلة متعددة آخر 24 ساعة. إن لم تكن أنت، دوّر مفتاح API فوراً.",
+    secChecklist: "قائمة تقوية الخادم",
+    secEvents24: "24 ساعة:",
+    secFailed: "فشل فتح",
+    secThrottled: "خنق",
+    secBlocked: "حجب SSRF",
   },
 } as const;
 
 interface StatusPayload {
   configured: boolean;
+}
+interface SecEvent {
+  id: string;
+  type: string;
+  severity: string;
+  ip: string;
+  userAgent: string;
+  detail: string;
+  createdAt: string;
+}
+interface SecurityData {
+  encryption: Record<string, { status: string; detail: string }>;
+  stats: { failed24h: number; throttled24h: number; blocked24h: number; total: number };
+  events: SecEvent[];
 }
 interface SystemStatus {
   store: { name: string; brandColor: string };
@@ -308,6 +396,14 @@ export default function SetupWizard() {
   const [copied, setCopied] = useState<string | null>(null);
   const [hookList, setHookList] = useState<string[]>([]);
   const [newHook, setNewHook] = useState("");
+  // privacy / lightning / security state
+  const [privacyMode, setPrivacyMode] = useState<"standard" | "balanced" | "maximum" | null>(null);
+  const [lnUrl, setLnUrl] = useState("");
+  const [lnPassword, setLnPassword] = useState("");
+  const [lnConnected, setLnConnected] = useState<boolean | null>(null);
+  const [lnMsg, setLnMsg] = useState<string | null>(null);
+  const [sec, setSec] = useState<SecurityData | null>(null);
+  const [showChecklist, setShowChecklist] = useState(false);
 
   function copyText(id: string, value: string) {
     void navigator.clipboard.writeText(value);
@@ -468,6 +564,101 @@ export default function SetupWizard() {
     setBusy(false);
   }
 
+  // ── privacy / lightning / security ─────────────────────────────────────────
+  const loadSecurity = useCallback(async (key: string) => {
+    try {
+      const [sr, lr, pr] = await Promise.all([
+        fetch("/api/system/security", { headers: { Authorization: `Bearer ${key}` } }),
+        fetch("/api/system/lightning", { headers: { Authorization: `Bearer ${key}` } }),
+        fetch("/api/system/privacy", { headers: { Authorization: `Bearer ${key}` } }),
+      ]);
+      if (sr.ok) setSec((await sr.json()) as SecurityData);
+      if (lr.ok) {
+        const d = (await lr.json()) as { url: string | null; connected: boolean };
+        setLnConnected(d.connected);
+        setLnUrl(d.url ?? "");
+      }
+      if (pr.ok) {
+        const d = (await pr.json()) as { mode: "standard" | "balanced" | "maximum" };
+        setPrivacyMode(d.mode);
+      }
+    } catch {
+      // monitor is best-effort
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!sys || !apiKey) return;
+    void loadSecurity(apiKey);
+    const iv = setInterval(() => void loadSecurity(apiKey), 15_000);
+    return () => clearInterval(iv);
+  }, [sys, apiKey, loadSecurity]);
+
+  async function savePrivacy(mode: "standard" | "balanced" | "maximum") {
+    setBusy(true);
+    await fetch("/api/system/privacy", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ mode }),
+    });
+    setPrivacyMode(mode);
+    setBusy(false);
+  }
+
+  async function connectLightning() {
+    setBusy(true);
+    setLnMsg(null);
+    const r = await fetch("/api/system/lightning", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ url: lnUrl.trim(), password: lnPassword }),
+    });
+    const d = await r.json();
+    if (r.ok) {
+      setLnConnected(true);
+      setLnPassword("");
+      setLnMsg(`${t.lnConnected}${d?.node?.version ? ` (${d.node.version})` : ""}`);
+    } else {
+      setLnMsg(`${d?.error ?? "ERROR"}${d?.detail ? ` — ${d.detail}` : ""}`);
+    }
+    setBusy(false);
+  }
+
+  async function disconnectLightning() {
+    setBusy(true);
+    await fetch("/api/system/lightning", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "-", password: "-", clear: true }),
+    });
+    setLnConnected(false);
+    setLnUrl("");
+    setLnMsg(null);
+    setBusy(false);
+  }
+
+  async function encryptNow() {
+    setBusy(true);
+    await fetch("/api/system/security", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "encrypt-secrets" }),
+    });
+    await loadSecurity(apiKey);
+    setBusy(false);
+  }
+
+  async function purgeLog() {
+    setBusy(true);
+    await fetch("/api/system/security", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "purge-log" }),
+    });
+    await loadSecurity(apiKey);
+    setBusy(false);
+  }
+
   // ── shared bits ───────────────────────────────────────────────────────────
   const Card = ({ children }: { children: React.ReactNode }) => (
     <div className="w-full max-w-xl rounded-2xl border bg-card p-6 sm:p-8 shadow-lg">
@@ -484,6 +675,27 @@ export default function SetupWizard() {
           : s === "underpaid"
             ? "border-amber-500/30 bg-amber-500/10 text-amber-600"
             : "border-border bg-muted text-muted-foreground";
+  const Badge = ({ kind }: { kind: "req" | "opt" | "rec" }) => (
+    <span
+      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+        kind === "req"
+          ? "border-orange-500/40 bg-orange-500/10 text-orange-600"
+          : kind === "rec"
+            ? "border-green-500/40 bg-green-500/10 text-green-600"
+            : "border-muted-foreground/30 bg-muted text-muted-foreground"
+      }`}
+    >
+      {kind === "req" ? t.badgeRequired : kind === "rec" ? t.badgeRecommended : t.badgeOptional}
+    </span>
+  );
+  const secEventColor = (sev: string) =>
+    sev === "critical"
+      ? "border-purple-500/40 bg-purple-500/10 text-purple-500"
+      : sev === "warn"
+        ? "border-amber-500/40 bg-amber-500/10 text-amber-600"
+        : sev === "ok"
+          ? "border-green-500/40 bg-green-500/10 text-green-600"
+          : "border-border bg-muted text-muted-foreground";
   const label = "mb-1.5 block text-sm font-medium text-foreground";
   const input =
     "w-full rounded-md border bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring";
@@ -585,6 +797,41 @@ export default function SetupWizard() {
                   <div className="rounded-lg border p-3"><div className="text-muted-foreground">{t.walletMode}</div><div className="font-semibold">{sys.wallet.mode === "watchonly" ? t.modeWatchonly : sys.wallet.mode === "selfcustody" ? t.modeSelfcustody : t.modeNone}</div></div>
                   <div className="rounded-lg border p-3"><div className="text-muted-foreground">{t.invoices}</div><div className="font-semibold">{sys.counts.invoices}</div></div>
                   <div className="rounded-lg border p-3"><div className="text-muted-foreground">{t.paid}</div><div className="font-semibold">{sys.counts.paid}</div></div>
+                </div>
+              </Card>
+
+              {/* ── PRIVACY MODE ───────────────────────────────────────── */}
+              <Card>
+                <div className="mb-1 flex items-center justify-between">
+                  <h2 className="text-lg font-bold">🛡️ {t.privacyTitle}</h2>
+                  <Badge kind="rec" />
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">{t.privacyIntro}</p>
+                <div className="space-y-2">
+                  {([
+                    ["maximum", t.privacyMaximum, t.privacyMaximumDesc],
+                    ["balanced", t.privacyBalanced, t.privacyBalancedDesc],
+                    ["standard", t.privacyStandard, t.privacyStandardDesc],
+                  ] as const).map(([mode, title, desc]) => (
+                    <button
+                      key={mode}
+                      disabled={busy}
+                      onClick={() => void savePrivacy(mode)}
+                      className={`w-full rounded-lg border p-3 text-start transition-colors ${
+                        privacyMode === mode
+                          ? "border-primary bg-primary/10 ring-1 ring-primary/40"
+                          : "hover:bg-muted"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-sm">{title}</span>
+                        {privacyMode === mode && (
+                          <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground">{t.privacyNow}</span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{desc}</p>
+                    </button>
+                  ))}
                 </div>
               </Card>
 
@@ -706,6 +953,40 @@ export default function SetupWizard() {
   -d '{"amountFiat": 9.99, "currency": "USD", "orderId": "order-123"}'`}</pre>
               </Card>
 
+              {/* ── LIGHTNING (OPTIONAL) ───────────────────────────────── */}
+              <Card>
+                <div className="mb-1 flex items-center justify-between">
+                  <h2 className="text-lg font-bold">⚡ {t.lnTitle}</h2>
+                  <Badge kind="opt" />
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">{t.lnIntro}</p>
+                <div className="mb-4 flex items-center gap-2 text-sm">
+                  {lnConnected ? (
+                    <span className="rounded-full border border-green-500/40 bg-green-500/10 px-3 py-1 text-xs font-semibold text-green-600">✓ {t.lnConnected}</span>
+                  ) : (
+                    <span className="rounded-full border border-border bg-muted px-3 py-1 text-xs text-muted-foreground">{t.lnDisconnected}</span>
+                  )}
+                  {lnConnected && (
+                    <button className="rounded border px-2 py-1 text-xs hover:bg-muted" disabled={busy} onClick={disconnectLightning}>
+                      {t.lnDisconnect}
+                    </button>
+                  )}
+                </div>
+                {privacyMode !== "maximum" && (
+                  <>
+                    <span className={label}>{t.lnUrl}</span>
+                    <input dir="ltr" className={`${input} mb-3 font-mono text-xs`} placeholder="https://phoenixd.example.com:9740" value={lnUrl} onChange={(e) => setLnUrl(e.target.value)} />
+                    <span className={label}>{t.lnPassword}</span>
+                    <input dir="ltr" type="password" className={`${input} mb-3 font-mono text-xs`} placeholder="••••••••" value={lnPassword} onChange={(e) => setLnPassword(e.target.value)} />
+                    <button className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90" disabled={busy || !lnUrl.trim() || !lnPassword} onClick={connectLightning}>
+                      {t.lnConnect}
+                    </button>
+                    {lnMsg && <p className="mt-2 text-xs text-muted-foreground">{lnMsg}</p>}
+                    <p className="mt-3 text-xs text-muted-foreground">{t.lnNote}</p>
+                  </>
+                )}
+              </Card>
+
               {/* ── RECENT INVOICES ────────────────────────────────────── */}
               <Card>
                 <h2 className="text-lg font-bold mb-3">🧾 {t.invoicesTitle}</h2>
@@ -730,6 +1011,79 @@ export default function SetupWizard() {
                         </div>
                       </li>
                     ))}
+                  </ul>
+                )}
+              </Card>
+
+              {/* ── SECURITY & MONITORING ──────────────────────────────── */}
+              <Card>
+                <h2 className="text-lg font-bold mb-3">🔐 {t.secTitle}</h2>
+
+                {sec && sec.stats.failed24h >= 5 && (
+                  <p className="mb-4 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-600">⚠ {t.secAlert}</p>
+                )}
+
+                <div className="mb-2 flex items-center justify-between">
+                  <span className={label}>{t.secEnc}</span>
+                  {sec && (sec.encryption.phoenixdPassword.status === "plaintext" || sec.encryption.backupPassphrase.status === "plaintext") && (
+                    <button className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90" disabled={busy} onClick={encryptNow}>
+                      {t.secEncryptNow}
+                    </button>
+                  )}
+                </div>
+                {sec && (
+                  <ul className="mb-4 space-y-1.5">
+                    {Object.entries(sec.encryption).map(([k, v]) => (
+                      <li key={k} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
+                        <span className="font-medium">{k}</span>
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span className="truncate text-xs text-muted-foreground" title={v.detail}>{v.detail}</span>
+                          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${secEventColor(v.status === "plaintext" ? "warn" : v.status === "encrypted" || v.status === "hash-only" ? "ok" : "info")}`}>
+                            {v.status}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <div className="mb-2 flex items-center justify-between">
+                  <span className={label}>{t.secMonitor}</span>
+                  <span className="text-[10px] text-muted-foreground">{t.secAuto}</span>
+                </div>
+                {sec && (
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    {t.secEvents24} {sec.stats.failed24h} {t.secFailed} · {sec.stats.throttled24h} {t.secThrottled} · {sec.stats.blocked24h} {t.secBlocked}
+                    <button className="ms-3 rounded border px-2 py-0.5 text-[10px] hover:bg-muted" disabled={busy} onClick={purgeLog}>{t.secPurge}</button>
+                  </p>
+                )}
+                <ul className="mb-4 max-h-72 space-y-1 overflow-y-auto">
+                  {(sec?.events ?? []).map((ev) => (
+                    <li key={ev.id} className="flex items-start justify-between gap-2 rounded-md border px-3 py-1.5 text-xs">
+                      <div className="min-w-0">
+                        <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${secEventColor(ev.severity)}`}>{ev.type}</span>
+                        <span className="ms-2 text-muted-foreground">{ev.detail}</span>
+                      </div>
+                      <span className="shrink-0 text-[10px] text-muted-foreground" title={ev.userAgent}>
+                        {ev.ip} · {new Date(ev.createdAt).toLocaleTimeString()}
+                      </span>
+                    </li>
+                  ))}
+                  {sec && sec.events.length === 0 && (
+                    <li className="rounded-md border px-3 py-2 text-xs text-muted-foreground">—</li>
+                  )}
+                </ul>
+
+                <button className="text-xs text-primary underline underline-offset-2" onClick={() => setShowChecklist((v) => !v)}>
+                  {t.secChecklist} {showChecklist ? "▴" : "▾"}
+                </button>
+                {showChecklist && (
+                  <ul className="mt-2 space-y-1 rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground" dir="ltr">
+                    <li><code>chmod 600 .env data/config.json</code> — secrets readable by the node user only</li>
+                    <li><code>ufw default deny + allow 22,443/tcp</code> — only SSH & HTTPS reach this box</li>
+                    <li><code>apt install fail2ban</code> — bans brute-force IPs at the firewall</li>
+                    <li>SSH keys only: <code>PasswordAuthentication no</code></li>
+                    <li>Keep phoenixd bound to 127.0.0.1 — never expose its port</li>
                   </ul>
                 )}
               </Card>
@@ -866,7 +1220,10 @@ export default function SetupWizard() {
 
         {step === 2 && (
           <>
-            <h1 className="text-xl font-bold mb-4">🏪 {t.store}</h1>
+            <div className="mb-1 flex items-center gap-2">
+              <h1 className="text-xl font-bold mb-4">🏪 {t.store}</h1>
+              <Badge kind="req" />
+            </div>
             <span className={label}>{t.storeName}</span>
             <input className={`${input} mb-4`} placeholder="Satoshi Coffee" value={storeName} onChange={(e) => setStoreName(e.target.value)} />
             <span className={label}>{t.brandColor}</span>
@@ -879,7 +1236,10 @@ export default function SetupWizard() {
 
         {step === 3 && (
           <>
-            <h1 className="text-xl font-bold mb-1">👛 {t.wallet}</h1>
+            <div className="mb-1 flex items-center gap-2">
+              <h1 className="text-xl font-bold mb-1">👛 {t.wallet}</h1>
+              <Badge kind="req" />
+            </div>
             <p className="mb-4 text-sm text-muted-foreground">{t.walletBody}</p>
             <div className="mb-4 grid grid-cols-2 gap-2">
               {(["zpub", "paymentcode"] as const).map((k) => (
@@ -913,7 +1273,10 @@ export default function SetupWizard() {
 
         {step === 4 && (
           <>
-            <h1 className="text-xl font-bold mb-4">⏱ {t.policy}</h1>
+            <div className="mb-1 flex items-center gap-2">
+              <h1 className="text-xl font-bold mb-4">⏱ {t.policy}</h1>
+              <Badge kind="rec" />
+            </div>
             <span className={label}>
               {t.confirmations}: <b>{confirmations}</b> {t.confirmationsUnit}
             </span>

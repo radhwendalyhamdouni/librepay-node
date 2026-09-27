@@ -89,3 +89,20 @@ model WebhookDelivery {
   @@index([status, nextRetryAt])
   @@index([invoiceId])
 }
+
+// Operator security monitor — the console's live "who knocked on my door".
+// Records auth failures (key guessing), SSRF blocks, sensitive actions and
+// delivery deaths. No secrets, no payloads — IP + type + short detail only.
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  type      String // auth_failed | auth_ok | rate_limited | ssrf_blocked | key_rotated | secrets_encrypted | webhooks_updated | backup_created | backup_restored | lightning_updated | setup_completed | delivery_dead
+  severity  String   @default("info") // info | warn | critical
+  ip        String   @default("-")
+  userAgent String   @default("")
+  detail    String   @default("")
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([type, createdAt])
+}

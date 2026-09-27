@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 import { assertOutboundUrl } from "./ssrf-guard";
 import { getWebhookEndpoints } from "@/lib/config";
 import { env } from "@/lib/env";
+import { logSecurityEvent, SecurityEventType } from "@/lib/server/audit";
 
 interface WebhookPayloadLike { timestamp?: number }
 
@@ -90,6 +91,7 @@ export async function processPendingDeliveries(limit = 25): Promise<number> {
     // editing .env later cannot orphan or redirect in-flight deliveries.
     if (!d.url || !d.secret) {
       await db.webhookDelivery.update({ where: { id: d.id }, data: { status: "dead", lastError: "endpoint removed" } });
+      logSecurityEvent({ type: SecurityEventType.DELIVERY_DEAD, severity: "warn", detail: `delivery ${d.id} dead — endpoint removed (${d.event})` });
       continue;
     }
     const attempts = d.attempts + 1;
@@ -140,6 +142,9 @@ export async function processPendingDeliveries(limit = 25): Promise<number> {
           nextRetryAt: ok ? null : minutesFromNow(RETRY_SCHEDULE_MIN[Math.min(attempts - 1, RETRY_SCHEDULE_MIN.length - 1)]),
         },
       });
+      if (!ok && attempts >= MAX_ATTEMPTS) {
+        logSecurityEvent({ type: SecurityEventType.DELIVERY_DEAD, severity: "warn", detail: `delivery ${d.id} dead after ${attempts} attempts — ${d.url.slice(0, 120)} (${errNote ?? "no error"})` });
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "network error";
       await db.webhookDelivery.update({
@@ -151,6 +156,9 @@ export async function processPendingDeliveries(limit = 25): Promise<number> {
           nextRetryAt: minutesFromNow(RETRY_SCHEDULE_MIN[Math.min(attempts - 1, RETRY_SCHEDULE_MIN.length - 1)]),
         },
       });
+      if (attempts >= MAX_ATTEMPTS) {
+        logSecurityEvent({ type: SecurityEventType.DELIVERY_DEAD, severity: "warn", detail: `delivery ${d.id} dead after ${attempts} attempts — ${d.url.slice(0, 120)} (${msg.slice(0, 120)})` });
+      }
     }
     processed++;
   }

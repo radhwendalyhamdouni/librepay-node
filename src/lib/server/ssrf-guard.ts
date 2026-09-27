@@ -16,6 +16,8 @@
  * validated by a live /getinfo handshake.
  */
 
+import { logSecurityEvent, SecurityEventType } from "@/lib/server/audit";
+
 const BLOCKED_HOSTNAMES = new Set([
   "localhost",
   "localhost.localdomain",
@@ -124,6 +126,14 @@ export function guardOutboundUrl(raw: string, opts?: { allowInsecureDev?: boolea
 /** Public reason → user-safe message key mapping is done at the call site. */
 export function assertOutboundUrl(raw: string, opts?: { allowInsecureDev?: boolean }): URL {
   const g = guardOutboundUrl(raw, opts);
-  if (!g.ok) throw new Error(g.reason);
+  if (!g.ok) {
+    // security monitor: someone (or a bad config) tried to reach a protected target
+    logSecurityEvent({
+      type: SecurityEventType.SSRF_BLOCKED,
+      severity: "warn",
+      detail: `${g.reason} ← ${raw.slice(0, 200)}`,
+    });
+    throw new Error(g.reason);
+  }
   return g.url;
 }

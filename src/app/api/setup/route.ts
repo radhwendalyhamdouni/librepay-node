@@ -26,6 +26,8 @@ import {
   verifySetupToken,
 } from "@/lib/server/settings";
 import { getBaseUrl } from "@/lib/config";
+import { encryptServerSecret } from "@/lib/server/crypto-server";
+import { logSecurityEvent, SecurityEventType } from "@/lib/server/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -151,7 +153,11 @@ export async function POST(req: Request) {
     webhookUrls: b.webhookUrl ? [b.webhookUrl] : prev.webhookUrls,
     webhookSecrets: b.webhookUrl ? [webhookSecret] : prev.webhookSecrets,
     lightning: b.lightning?.url
-      ? { url: b.lightning.url, password: b.lightning.password ?? null }
+      ? {
+          url: b.lightning.url,
+          password: "",
+          passwordEnc: b.lightning.password ? encryptServerSecret(b.lightning.password) : null,
+        }
       : prev.lightning,
     backup: b.backup
       ? {
@@ -160,9 +166,17 @@ export async function POST(req: Request) {
           retain: b.backup.retain,
           remoteTarget: b.backup.remoteTarget,
           remotePort: b.backup.remotePort,
-          passphrase: b.backup.passphrase || prev.backup.passphrase,
+          passphrase: "",
+          passphraseEnc: b.backup.passphrase ? encryptServerSecret(b.backup.passphrase) : prev.backup.passphraseEnc,
         }
       : prev.backup,
+  });
+
+  logSecurityEvent({
+    type: SecurityEventType.SETUP_COMPLETED,
+    severity: "critical",
+    req,
+    detail: firstSetup ? "first setup completed — node is live" : "setup re-run (config overwritten)",
   });
 
   if (firstSetup) consumeSetupToken();

@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { authenticateApiKey, generateApiKey } from "@/lib/server/api-auth";
 import { getSettings, saveSettings } from "@/lib/server/settings";
+import { logSecurityEvent, SecurityEventType } from "@/lib/server/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ export async function POST(req: Request) {
 
   const key = generateApiKey();
   saveSettings({ apiKeyHash: key.hash });
+  logSecurityEvent({ type: SecurityEventType.KEY_ROTATED, severity: "critical", req, detail: "operator API key rotated — old key revoked" });
   return NextResponse.json(
     {
       ok: true,

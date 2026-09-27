@@ -11,6 +11,8 @@ import { z } from "zod";
 import { authenticateApiKey } from "@/lib/server/api-auth";
 import { pushRemote } from "@/lib/server/backup";
 import { getSettings, saveSettings } from "@/lib/server/settings";
+import { encryptServerSecret } from "@/lib/server/crypto-server";
+import { logSecurityEvent, SecurityEventType } from "@/lib/server/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +40,8 @@ export async function PUT(req: Request) {
   const b = body.data;
 
   if (b.clear) {
-    saveSettings({ backup: { ...getSettings().backup, remoteTarget: "", passphrase: "" } });
+    saveSettings({ backup: { ...getSettings().backup, remoteTarget: "", passphrase: "", passphraseEnc: null } });
+    logSecurityEvent({ type: SecurityEventType.BACKUP_CREATED, severity: "info", req, detail: "remote backup target cleared" });
     return NextResponse.json({ ok: true, cleared: true });
   }
 
@@ -47,9 +50,14 @@ export async function PUT(req: Request) {
       ...getSettings().backup,
       remoteTarget: b.remoteTarget,
       remotePort: b.remotePort,
-      ...(b.passphrase !== undefined ? { passphrase: b.passphrase } : {}),
+      ...(b.passphrase !== undefined
+        ? b.passphrase
+          ? { passphraseEnc: encryptServerSecret(b.passphrase), passphrase: "" } // encrypted at rest
+          : { passphraseEnc: null, passphrase: "" }
+        : {}),
     },
   });
+  logSecurityEvent({ type: SecurityEventType.BACKUP_CREATED, req, detail: `remote target saved (${b.test ? "with" : "without"} test push)` });
 
   if (b.test) {
     const push = await pushRemote();
