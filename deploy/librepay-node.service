@@ -1,0 +1,51 @@
+# ── LibrePay Node — hardened systemd unit ───────────────────────────────────
+# Template: adjust User=, paths and the bun location to your install.
+#   cp deploy/librepay-node.service /etc/systemd/system/librepay-node.service
+#   systemctl daemon-reload && systemctl enable --now librepay-node
+#
+# Pair it with tor:  After=tor.service  (add if the node should start after Tor)
+
+[Unit]
+Description=LibrePay Node — self-hosted Bitcoin payment gateway
+Documentation=https://github.com/radhwendalyhamdouni/librepay-node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=librepay
+Group=librepay
+# Where the repo lives (bun run start launches .next/standalone)
+WorkingDirectory=/opt/librepay-node
+Environment=NODE_ENV=production
+Environment=LP_DATA_DIR=/var/lib/librepay-node
+# Secrets live in /opt/librepay-node/.env (chmod 600, owned by librepay)
+ExecStart=/usr/bin/bun run start
+Restart=always
+RestartSec=3
+
+# ── hardening ────────────────────────────────────────────────────────────────
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/librepay-node
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+# NOTE: MemoryDenyWriteExecute is deliberately NOT set — JavaScriptCore's JIT
+# needs writable+executable memory and the service would crash with it on.
+
+[Install]
+WantedBy=multi-user.target

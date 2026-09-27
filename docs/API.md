@@ -75,8 +75,10 @@ underpaid (received < 99% of amountSats after confirmations)
 
 ## Webhooks
 
-Configured via `LP_WEBHOOK_URLS` + `LP_WEBHOOK_SECRETS`. Every transition is
-POSTed as JSON:
+Configured via `LP_WEBHOOK_URLS` + `LP_WEBHOOK_SECRETS` (or the console →
+Webhooks). Every transition is POSTed as JSON. Destinations may be clearnet
+`https://` URLs **or Tor v3 onion services** (`http(s)://…56-chars….onion` —
+onion transport is end-to-end encrypted, see docs/DEPLOY_TOR.md §4):
 
 ```json
 { "event": "invoice.confirmed", "invoiceId": "m01abc…", "data": { "invoice": { "status": "confirmed", "txid": "…", "…": "…" } }, "timestamp": 1790000000000 }

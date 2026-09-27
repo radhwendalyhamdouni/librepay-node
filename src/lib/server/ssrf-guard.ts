@@ -101,9 +101,19 @@ export function guardOutboundUrl(raw: string, opts?: { allowInsecureDev?: boolea
     return { ok: false, reason: "https_required" };
   }
 
+  // Tor v3 onion services only: exactly 56 base32 chars (the service public
+  // key). Self-authenticating, un-DNS-rebindable, transport encrypted by the
+  // onion protocol itself — plain http:// over Tor is NOT cleartext. Anything
+  // else under .onion is not a real v3 address and is rejected. Reaching a
+  // valid one requires .onion resolution (tor DNSPort) — docs/DEPLOY_TOR.md §4.
+  const onionHost = url.hostname.toLowerCase().replace(/\.$/, "");
+  const isV3Onion = /^[a-z2-7]{56}\.onion$/.test(onionHost);
+  if (isV3Onion) return { ok: true, url };
+
   if (url.protocol !== "https:") return { ok: false, reason: "https_required" };
 
-  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  const host = onionHost;
+  if (host.endsWith(".onion")) return { ok: false, reason: "invalid_onion" }; // not a v3 address
   if (BLOCKED_HOSTNAMES.has(host)) return { ok: false, reason: "blocked_host" };
   for (const suf of BLOCKED_SUFFIXES) {
     if (host.endsWith(suf)) return { ok: false, reason: "blocked_host" };

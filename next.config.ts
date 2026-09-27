@@ -37,6 +37,12 @@ const nextConfig: NextConfig = {
       { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
       { key: "X-DNS-Prefetch-Control", value: "on" },
     ];
+    // Tor mirror auto-offer: when the operator publishes an onion address,
+    // Tor Browser prompts to switch to it (same UX as BTCPay's onion mirror).
+    const onion = process.env.LP_ONION_URL ?? "";
+    if (/^https?:\/\/[a-z2-7]{16,}\.onion\/?$/i.test(onion.trim())) {
+      securityHeaders.push({ key: "Onion-Location", value: onion.trim() });
+    }
     return [{ source: "/:path*", headers: securityHeaders }];
   },
 };

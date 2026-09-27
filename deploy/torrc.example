@@ -1,0 +1,28 @@
+# ── LibrePay Node — Tor v3 hidden service ───────────────────────────────────
+# Drop-in snippet for /etc/tor/torrc (or /etc/tor/torrc.d/librepay.conf).
+# Full walkthrough: docs/DEPLOY_TOR.md
+
+# This tor instance only SERVES the hidden service. It does not need to be a
+# proxy for your apps — unless you also want .onion egress (webhooks to shops
+# that live on Tor), then uncomment DNSPort too (DEPLOY_TOR.md §4):
+# SocksPort 0
+# DNSPort 127.0.0.1:5353
+# AutomapHostsOnResolve 1
+
+HiddenServiceDir /var/lib/tor/librepay-node/
+# Tor listens on 80 inside the onion network and forwards to the node's local
+# port. The node itself must NEVER be exposed to the public internet directly.
+HiddenServicePort 80 127.0.0.1:3000
+
+# v3 client authorization — console for your eyes only. Generate a keypair
+# with `tor --keygen`, drop the public key in
+# /var/lib/tor/librepay-node/authorized_clients/, keep the .auth_private file
+# on the devices that are allowed to open your node.
+# (Leave commented for a public checkout-facing onion.)
+
+# 3 introduction points = default resilience; raise to 6 for a busy store.
+HiddenServiceNumIntroductionPoints 3
+
+# After `systemctl reload tor` your onion address is:
+#   cat /var/lib/tor/librepay-node/hostname
+# …aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.onion  (56 chars)

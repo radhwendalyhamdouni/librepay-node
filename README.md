@@ -154,8 +154,24 @@ Payment appears in your wallet; your webhook receives `invoice.confirmed`.
 
 - **WooCommerce**: drop [`integrations/woocommerce/`](integrations/woocommerce/)
   into your plugins folder, set the node URL + API key. Done.
-- **Any other platform**: the full API is two authenticated endpoints —
+- **Any platform, copy-paste**: ready-made integration snippets in
+  [`examples/`](examples/) — PHP, Node, Python, a hardened webhook receiver
+  (timing-safe signature check + idempotency), and a backend proxy for the
+  [`librepay.js`](public/librepay.js) embed button.
+- **The full contract**: two authenticated endpoints —
   [docs/API.md](docs/API.md) has every field and every webhook event.
+
+## Deploy on Tor
+
+Yes, it runs as a Tor v3 hidden service — clearnet + onion mirror (recommended)
+or onion-only. One drop-in torrc, hardened systemd unit, cookie/webhook/explorer
+details: [docs/DEPLOY_TOR.md](docs/DEPLOY_TOR.md). Set `LP_ONION_URL` to
+auto-offer the mirror via `Onion-Location`.
+
+## Where this is going
+
+Prioritized plan (idempotency keys, transactional outbox, reorg checks,
+metrics, one-command update): [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Status lifecycle
 
