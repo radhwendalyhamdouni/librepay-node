@@ -1,7 +1,10 @@
 # LibrePay Node — API v1
 
-Same contract as the LibrePay platform. A client written for librepay.tech
-works against this node by changing the base URL and API key only.
+Fully self-hosted: the node depends on no external platform — only the Bitcoin
+chain (Esplora API you configure) and your own webhook endpoints. The contract
+is wire-compatible with the LibrePay platform, so a client written for
+librepay.tech works against this node by changing the base URL and API key
+only.
 
 ## Authentication
 

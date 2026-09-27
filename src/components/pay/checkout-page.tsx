@@ -39,8 +39,12 @@ interface PublicInvoice {
   refundDeclineReason: string | null;
   refundsEnabled: boolean;
   refundWindowDays: number;
+  /** derived server-side from the operator's ESPLORA_API — self-hosted explorers stay self-hosted */
+  explorerTxBase: string | null;
   merchant: { name: string; brandColor: string; logoUrl: string | null };
 }
+
+const EXPLORER_FALLBACK = "https://mempool.space";
 
 const STATUS_FLOW = ["waiting", "detected", "confirmed", "settled"] as const;
 
@@ -308,7 +312,7 @@ export function CheckoutPage({ invoiceId }: { invoiceId: string }) {
             )}
             {inv.txid && (
               <a
-                href={`https://mempool.space/tx/${inv.txid}`}
+                href={`${inv.explorerTxBase ?? EXPLORER_FALLBACK}/tx/${inv.txid}`}
                 target="_blank" rel="noopener noreferrer"
                 className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
               >
@@ -405,7 +409,7 @@ export function CheckoutPage({ invoiceId }: { invoiceId: string }) {
             </div>
             {inv.status === "detected" && inv.txid && (
               <div className="mt-2 text-center">
-                <a href={`https://mempool.space/tx/${inv.txid}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                <a href={`${inv.explorerTxBase ?? EXPLORER_FALLBACK}/tx/${inv.txid}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
                   {t("pay.opentx")} <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
@@ -511,7 +515,7 @@ function RefundSection(props: RefundSectionProps) {
         )}
         {inv.refundTxid && (
           <a
-            href={`https://mempool.space/tx/${inv.refundTxid}`}
+            href={`${inv.explorerTxBase ?? EXPLORER_FALLBACK}/tx/${inv.refundTxid}`}
             target="_blank" rel="noopener noreferrer"
             className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >

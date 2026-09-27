@@ -637,6 +637,13 @@ export default function SetupWizard() {
               value={walletValue}
               onChange={(e) => setWalletValue(e.target.value)}
             />
+            <p className="mt-3 text-xs text-muted-foreground">
+              {lang === "ar" ? "لا تملك محفظة بعد؟ ولّد واحدة باردة في متصفحك — " : "No wallet yet? Generate a cold one in your browser — "}
+              <Link href={`/cold?lang=${lang}`} className="font-medium text-primary underline underline-offset-2">
+                {lang === "ar" ? "مولّد المحفظة الباردة" : "Cold Wallet generator"}
+              </Link>
+              {lang === "ar" ? " (يعمل دون اتصال)." : " (works offline)."}
+            </p>
           </>
         )}
 

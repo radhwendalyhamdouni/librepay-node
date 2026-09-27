@@ -71,6 +71,39 @@ the setup code self-destructs, and the node starts receiving Bitcoin.
 | 🌍 **6-language checkout** | en · ar (RTL) · fr · es · pt · fil — detected from the buyer's browser. |
 | 🕐 **Self-watching** | Embedded chain watcher (Esplora) — no external cron needed. |
 | 🔐 **Strict API** | Zod-validated, rate-limited, `lp_live_` keys, SSRF-guarded outbound calls. |
+| 🏝 **Fully independent** | No platform behind it. No SaaS, no accounts, no phone-home. Every external touchpoint (chain data, explorer links, Lightning, webhooks) is configured by YOU and stays under YOUR control. |
+
+## 🏝 Independence — no platform, no third party
+
+LibrePay Node is not a client of any payment service. It is the whole payment
+service, on your box:
+
+- **Zero runtime calls to any platform.** Nothing in the codebase talks to
+  librepay.tech or any vendor API. The node speaks directly to the Bitcoin
+  chain and (optionally) your own phoenixd.
+- **Chain data you choose.** `ESPLORA_API` defaults to mempool.space for
+  convenience, but point it at your own Esplora/mempool instance (or even a
+  local Electrum-backed one) and the node never touches a public service.
+- **Explorer links follow your setup.** "View transaction" links on the
+  checkout page are derived from `ESPLORA_API` — self-host your mempool UI
+  and buyers stay on your infrastructure too.
+- **Pricing without oracles you don't trust.** USD-anchored quotes try public
+  price feeds (Esplora → CoinGecko → blockchain.info) and fall back to static
+  rates offline; the primary source is your configured Esplora. A fully
+  offline node still issues invoices at the last-known rate — checkout never
+  breaks.
+- **Cold wallet generator built in.** `https://your-node/cold` is a static,
+  100% client-side page: load it, disconnect from the internet, generate a
+  BIP39 mnemonic + BIP47 payment code or BIP84 zpub. Nothing is sent,
+  stored, or logged — the browser tab is the tool. No external wallet
+  generator website involved, ever.
+- **Webhooks go only where YOU say.** Signed HMAC deliveries to endpoints you
+  own; SSRF guards block everything else.
+
+Wire-compatibility with the LibrePay SaaS contract is a convenience for
+migration (same API shape for WooCommerce / existing clients), not a
+dependency — the node runs forever with no other machine on the internet
+except Bitcoin itself.
 
 ## The honest risk model
 

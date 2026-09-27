@@ -10,6 +10,22 @@ import { db } from "@/lib/db";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { bip21Uri } from "@/lib/bitcoin";
 import { getMerchant } from "@/lib/config";
+import { env } from "@/lib/env";
+
+/**
+ * Block-explorer base derived from the operator's OWN Esplora setting —
+ * running a self-hosted mempool instance means even the "view on explorer"
+ * links stay inside infrastructure the operator controls. Non-mempool or
+ * malformed ESPLORA_API values fall back to mempool.space.
+ */
+function explorerTxBase(): string {
+  try {
+    const u = new URL(env.ESPLORA_API);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return "https://mempool.space";
+  }
+}
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const rl = rateLimit(`pubinv:${clientIp(req)}`, 120, 60_000);
@@ -45,6 +61,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       refundDeclineReason: null,
       refundsEnabled: false, // manual refunds happen straight from the operator wallet
       refundWindowDays: 0,
+      explorerTxBase: explorerTxBase(),
       merchant: {
         name: me.name,
         brandColor: me.brandColor,

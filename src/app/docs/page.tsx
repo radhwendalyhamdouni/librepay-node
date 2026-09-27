@@ -50,9 +50,11 @@ export default function DocsPage() {
         <header className="space-y-2">
           <h1 className="text-3xl font-bold">Merchant API v1</h1>
           <p className="text-muted-foreground">
-            Two authenticated endpoints. Same contract as the LibrePay platform —
-            clients written for librepay.tech work against this node by changing
-            the base URL and key only.
+            Two authenticated endpoints. Fully self-hosted — this node talks to
+            the Bitcoin chain and nothing else. The contract is wire-compatible
+            with the LibrePay platform: existing clients work by changing the
+            base URL and key only, with zero dependence on any third-party
+            service.
           </p>
         </header>
 
