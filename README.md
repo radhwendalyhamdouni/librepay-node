@@ -1,5 +1,9 @@
 # ₿ LibrePay Node
 
+<div align="center">
+  <img src="public/brand/logo-lockup-dark.png" alt="LibrePay — Your payments. Your server. Your keys." width="420" />
+</div>
+
 **Your payments. Your server. Your keys.**
 
 Self-hosted, non-custodial Bitcoin payment gateway. One process, one database,
@@ -10,9 +14,50 @@ for your shop — and **zero accounts, zero KYC, zero custodial risk**.
 > بوابة دفع بيتكوين ذاتية الاستضافة وغير الحاجزة — عناوين ستيلث على السلسلة
 > ولايتنين فوري عبر phoenixd. لا حسابات، لا KYC، والمفاتيح لا تلمس الخادم أبداً.
 
-[English](#features) · [العربية](#المزايا)
+[English](#-one-command-install) · [العربية](#-التثبيت-بأمر-واحد)
 
 ---
+
+## ⚡ One-command install
+
+The installer detects your server type (Debian/Ubuntu, Fedora/RHEL, Arch,
+openSUSE, Alpine — or Docker) and does everything:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/radhwendalyhamdouni/librepay-node/main/install.sh | bash
+# or with automatic HTTPS:
+bash install.sh --domain pay.example.com
+# or Docker:
+bash install.sh --docker
+```
+
+It prints your **node URL** and a **one-time setup code**, then:
+
+## 🧙 First-run wizard — 5 questions and you're live
+
+Open `https://your-node/setup` — the node walks you through:
+
+1. **Setup code** (proof of server access: `cat data/SETUP_TOKEN`)
+2. **Store identity** — name + brand color
+3. **Receiving wallet** — watch-only `zpub` or BIP47 **payment code**;
+   the node derives a real address as *proof* it sees your wallet before accepting it
+4. **Payment policy** — confirmations + invoice expiry
+5. **Backups** — periodic schedule, retention, optional SSH off-server copy
+   and an AES-256-GCM passphrase
+
+Press **🚀 LAUNCH NODE** — your API key is issued (shown exactly once),
+the setup code self-destructs, and the node starts receiving Bitcoin.
+
+## 💾 Backups & restore
+
+- **Automatic**: the embedded scheduler takes an encrypted archive
+  (consistent `VACUUM INTO` snapshot + config) every N hours, keeps the last N.
+- **Off-server**: set `user@host:/path` in the operator console — archives are
+  pushed with `scp` (SSH transport) and, with a passphrase, are
+  **AES-256-GCM encrypted at rest**.
+- **Restore**: download or upload an archive at `/setup`, or use the API —
+  files are staged safely, applied by `npm run restore` (with a pre-restore
+  snapshot), then one restart.
 
 ## Features
 

@@ -1,14 +1,16 @@
 /**
  * API-key authentication for the public merchant API (v1).
  *
- * LibrePay Node edition: ONE operator key lives in .env (LP_API_KEY), generated
- * by `bun run setup` in the exact platform format lp_live_<48 hex>. Compared
- * timing-safe against its sha256 — the raw key never appears in logs.
+ * LibrePay Node edition: ONE operator key — set by `bun run setup` (env
+ * LP_API_KEY) or by the first-run Setup Wizard (persisted as sha256 in
+ * data/config.json). Format: lp_live_<48 hex>. Compared timing-safe against
+ * its sha256 — the raw key never appears in logs or on disk.
  */
 
 import { createHash, timingSafeEqual } from "node:crypto";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { env } from "@/lib/env";
+import { getSettings } from "@/lib/server/settings";
 
 export function hashApiKey(raw: string): string {
   return createHash("sha256").update(raw).digest("hex");
@@ -28,11 +30,20 @@ const KEY_RE = /^Bearer\s+(lp_live_[a-f0-9]{48})$/i;
 export async function authenticateApiKey(req: Request): Promise<{ merchantId: string; keyId: string } | null> {
   const auth = req.headers.get("authorization") ?? "";
   const m = KEY_RE.exec(auth.trim());
-  if (!m || !env.API_KEY) return null;
+  if (!m) return null;
   // Throttle DB-less lookups against key-guessing / hammering clients.
   if (!rateLimit(`apikeylookup:${clientIp(req)}`, 60, 60_000).ok) return null;
-  const a = Buffer.from(hashApiKey(m[1]));
-  const b = Buffer.from(hashApiKey(env.API_KEY));
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  return { merchantId: "self", keyId: "env" };
+  const presented = Buffer.from(hashApiKey(m[1]));
+  // hash sources: Setup Wizard config (preferred), then classic .env
+  const configHash = getSettings().apiKeyHash;
+  const candidates = [configHash, env.API_KEY ? hashApiKey(env.API_KEY) : null].filter(
+    (h): h is string => typeof h === "string"
+  );
+  for (const expected of candidates) {
+    const b = Buffer.from(expected);
+    if (presented.length === b.length && timingSafeEqual(presented, b)) {
+      return { merchantId: "self", keyId: configHash ? "config" : "env" };
+    }
+  }
+  return null;
 }

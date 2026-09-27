@@ -7,6 +7,7 @@
  */
 
 import { cronTick } from "./invoice-events";
+import { maybeBackup } from "./backup";
 
 let timer: ReturnType<typeof setInterval> | null = null;
 let running = false;
@@ -20,6 +21,7 @@ export function startScheduler(): void {
     running = true;
     try {
       await cronTick();
+      await maybeBackup(); // periodic encrypted backup + off-server push
     } catch (err) {
       console.error("[cron]", err);
     } finally {
