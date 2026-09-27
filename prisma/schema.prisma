@@ -1,0 +1,91 @@
+// LibrePay Node — single-operator schema.
+// Two tables. No accounts, no merchants, no plans, no refunds ledger.
+// Money state lives on the chain, not in this database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Invoice {
+  id String @id @default(cuid())
+  // kept for contract-compatibility with the platform engine; always "self"
+  merchantId String @default("self")
+
+  // Money
+  amountSats      BigInt
+  receivedSats    BigInt  @default(0)
+  fiatCurrency    String? // USD, EUR, ...
+  fiatAmountCents Int?
+  satsPerUnit     String? // exchange rate snapshot at creation (stringified float)
+
+  // Derivation (public data only)
+  derivationMode      String  @default("stealth") // stealth | watchonly
+  stealthAddress      String  @unique
+  ephemeralPub        String? // hex — needed by operator wallet to compute spend key
+  paymentCodeSnapshot String? // payment code at creation time
+  derivationIndex     Int? // for watchonly mode (m/0/{index})
+
+  // Business fields
+  orderId     String?
+  description String?
+  metadata    String? // stringified JSON (portable)
+  buyerLang   String  @default("en")
+
+  // Lifecycle: waiting → detected → confirmed → settled | expired | underpaid
+  status                String    @default("waiting")
+  txid                  String?
+  confirmations         Int       @default(0)
+  confirmationsRequired Int       @default(2)
+  expiresAt             DateTime
+  paidAt                DateTime?
+  settledAt             DateTime?
+  expiredNotified       Boolean   @default(false)
+  underpaidNotified     Boolean   @default(false)
+
+  // Lightning (optional second rail — same invoice, instant settlement)
+  lightningPaymentRequest String? // bolt11 invoice string (lnbc…)
+  lightningPaymentHash    String? // payment hash for lookup/idempotency
+  lightningPaidAt         DateTime?
+  paidVia                 String? // onchain | lightning (set at first payment rail)
+
+  webhookDeliveries WebhookDelivery[]
+
+  // Manual refunds are sent straight from the operator wallet; we only
+  // remember the first funding input for convenience.
+  payerAddress String?
+  refundStatus String @default("none")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([lightningPaymentHash])
+  @@index([merchantId, status])
+  @@index([merchantId, createdAt])
+  @@index([status, expiresAt])
+}
+
+model WebhookDelivery {
+  id        String   @id @default(cuid())
+  // url + secret are SNAPSHOTTED at enqueue time: editing .env later cannot
+  // orphan or redirect in-flight deliveries.
+  url       String
+  secret    String
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  event     String
+  payload   String // stringified JSON
+  status    String   @default("pending") // pending | success | failed | dead
+  attempts  Int      @default(0)
+  responseStatus Int?
+  lastError String?
+  nextRetryAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([status, nextRetryAt])
+  @@index([invoiceId])
+}

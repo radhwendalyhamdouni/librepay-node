@@ -1,0 +1,59 @@
+version: "3.8"
+
+# LibrePay Node — one VPS, three services.
+#   node      the gateway (this repo)
+#   phoenixd  instant Lightning (auto channels via ACINQ)
+#   tor       optional .onion reachability — privacy without a domain
+
+services:
+  node:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # inside the compose network phoenixd is a hostname, not localhost
+      LP_LIGHTNING_URL: http://phoenixd:9740
+      DATABASE_URL: file:/app/data/node.db
+    ports:
+      - "127.0.0.1:3000:3000"   # front with Caddy/nginx for TLS, or expose via tor
+    volumes:
+      - node-data:/app/data
+    depends_on:
+      - phoenixd
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  phoenixd:
+    build:
+      context: ..
+      dockerfile: docker/phoenixd.Dockerfile
+    restart: unless-stopped
+    command: >
+      phoenixd --http-bind-ip 0.0.0.0 --http-bind-port 9740
+               --webhook http://node:3000/api/lightning/phoenixd
+    volumes:
+      - phoenixd-data:/phoenix/.phoenix
+    # Lightning is a hot wallet: keep the port unreachable from the internet.
+    # No published ports — node talks to it over the internal network only.
+
+  tor:
+    image: dperson/torproxy:latest
+    restart: unless-stopped
+    profiles: ["onion"]   # start with: docker compose --profile onion up -d
+    environment:
+      # hidden service → node:3000
+      TOR_HIDDEN_SERVICE_PORT: "80"
+      TOR_HIDDEN_SERVICE_HOST: "node"
+      TOR_HIDDEN_SERVICE_TARGET_PORT: "3000"
+    volumes:
+      - tor-data:/var/lib/tor
+
+volumes:
+  node-data:
+  phoenixd-data:
+  tor-data:

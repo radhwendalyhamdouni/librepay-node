@@ -1,0 +1,25 @@
+# secrets and state
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# deps & builds
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# logs & junk
+*.log
+.DS_Store
+*.pem
+.curserc/
+
+# keep the example config
+!/.env.example
