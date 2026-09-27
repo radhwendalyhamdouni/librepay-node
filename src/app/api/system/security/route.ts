@@ -9,7 +9,11 @@
  */
 
 import { NextResponse } from "next/server";
-import { authenticateApiKey } from "@/lib/server/api-auth";
+import {
+  authenticateConsole,
+  stepUpSatisfied,
+  STEP_UP_REQUIRED,
+} from "@/lib/server/console-auth";
 import { getSettings, saveSettings } from "@/lib/server/settings";
 import { encryptServerSecret } from "@/lib/server/crypto-server";
 import { db } from "@/lib/db";
@@ -39,7 +43,7 @@ function encryptionStatus() {
 }
 
 export async function GET(req: Request) {
-  if (!(await authenticateApiKey(req))) {
+  if (!(await authenticateConsole(req))) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
@@ -64,8 +68,13 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  if (!(await authenticateApiKey(req))) {
+  const auth = await authenticateConsole(req);
+  if (!auth) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+  // STEP-UP: encrypt-secrets migrates credentials; purge-log erases evidence.
+  if (!stepUpSatisfied(auth)) {
+    return NextResponse.json(STEP_UP_REQUIRED, { status: 403 });
   }
   const body = (await req.json().catch(() => ({}))) as { action?: string };
   const action = body.action ?? "";

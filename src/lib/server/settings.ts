@@ -47,6 +47,17 @@ export interface BackupSettings {
   passphraseEnc: string | null; // AES-256-GCM blob (encryptServerSecret) — encrypted at rest
 }
 
+export interface ConsoleSettings {
+  /** scrypt hash of the operator console password ("scrypt$N$r$p$salt$hash"). */
+  passwordHash: string | null;
+  /** TOTP shared secret (base32), AES-256-GCM encrypted at rest. */
+  totpEnc: string | null;
+  /** true only after the first code was verified — half-enabled 2FA never gates login. */
+  totpConfirmed: boolean;
+  /** last consumed TOTP timestep — replay protection. */
+  totpLastStep: number;
+}
+
 export interface Settings {
   version: 1;
   setupComplete: boolean;
@@ -68,6 +79,8 @@ export interface Settings {
   privacyMode: "standard" | "balanced" | "maximum";
   lightning: { url: string | null; password: string | null; passwordEnc: string | null };
   backup: BackupSettings;
+  /** Operator console credential (human login) — the API key stays for integrations. */
+  console: ConsoleSettings;
   createdAt: string;
   updatedAt: string;
 }
@@ -110,6 +123,7 @@ function defaults(): Settings {
       passphrase: "",
       passphraseEnc: null,
     },
+    console: { passwordHash: null, totpEnc: null, totpConfirmed: false, totpLastStep: 0 },
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -136,6 +150,7 @@ export function getSettings(): Settings {
     ...file,
     lightning: { ...d.lightning, ...(file.lightning ?? {}) },
     backup: { ...d.backup, ...(file.backup ?? {}) },
+    console: { ...d.console, ...(file.console ?? {}) },
   };
   cache = { mtimeMs: mtime, value: merged };
   return merged;
@@ -178,6 +193,7 @@ export function saveSettings(patch: Partial<Settings>): Settings {
     ...patch,
     lightning: { ...defaults().lightning, ...(current.lightning ?? {}), ...(patch.lightning ?? {}) },
     backup: { ...defaults().backup, ...(current.backup ?? {}), ...(patch.backup ?? {}) },
+    console: { ...defaults().console, ...(current.console ?? {}), ...(patch.console ?? {}) },
     version: 1,
     updatedAt: new Date().toISOString(),
   };

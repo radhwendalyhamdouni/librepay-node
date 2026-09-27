@@ -5,13 +5,13 @@
  */
 
 import { NextResponse } from "next/server";
-import { authenticateApiKey } from "@/lib/server/api-auth";
+import { authenticateConsole } from "@/lib/server/console-auth";
 import { readBackupFile } from "@/lib/server/backup";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request, ctx: { params: Promise<{ name: string }> }) {
-  const auth = await authenticateApiKey(req);
+  const auth = await authenticateConsole(req);
   if (!auth) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
   const { name } = await ctx.params;

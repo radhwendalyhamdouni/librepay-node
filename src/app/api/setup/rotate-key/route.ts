@@ -4,15 +4,24 @@
  */
 
 import { NextResponse } from "next/server";
-import { authenticateApiKey, generateApiKey } from "@/lib/server/api-auth";
+import { generateApiKey } from "@/lib/server/api-auth";
+import {
+  authenticateConsole,
+  stepUpSatisfied,
+  STEP_UP_REQUIRED,
+} from "@/lib/server/console-auth";
 import { getSettings, saveSettings } from "@/lib/server/settings";
 import { logSecurityEvent, SecurityEventType } from "@/lib/server/audit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const auth = await authenticateApiKey(req);
+  const auth = await authenticateConsole(req);
   if (!auth) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  // STEP-UP: rotating the master key invalidates every shop integration.
+  if (!stepUpSatisfied(auth)) {
+    return NextResponse.json(STEP_UP_REQUIRED, { status: 403 });
+  }
 
   const key = generateApiKey();
   saveSettings({ apiKeyHash: key.hash });

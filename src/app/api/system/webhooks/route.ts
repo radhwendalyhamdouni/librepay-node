@@ -12,7 +12,11 @@
  */
 
 import { NextResponse } from "next/server";
-import { authenticateApiKey } from "@/lib/server/api-auth";
+import {
+  authenticateConsole,
+  stepUpSatisfied,
+  STEP_UP_REQUIRED,
+} from "@/lib/server/console-auth";
 import { getSettings, saveSettings } from "@/lib/server/settings";
 import { assertOutboundUrl } from "@/lib/server/ssrf-guard";
 import { env } from "@/lib/env";
@@ -21,15 +25,21 @@ import { logSecurityEvent, SecurityEventType } from "@/lib/server/audit";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  if (!(await authenticateApiKey(req))) {
+  if (!(await authenticateConsole(req))) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
   return NextResponse.json({ ok: true, urls: getSettings().webhookUrls });
 }
 
 export async function PUT(req: Request) {
-  if (!(await authenticateApiKey(req))) {
+  const auth = await authenticateConsole(req);
+  if (!auth) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+  // STEP-UP: changing webhook destinations is the payment-redirection attack
+  // a stolen cookie would attempt first — it re-asks the operator password.
+  if (!stepUpSatisfied(auth)) {
+    return NextResponse.json(STEP_UP_REQUIRED, { status: 403 });
   }
 
   const body = (await req.json().catch(() => ({}))) as { urls?: unknown };

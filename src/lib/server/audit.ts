@@ -30,6 +30,19 @@ export const SecurityEventType = {
   LIGHTNING_UPDATED: "lightning_updated",
   SETUP_COMPLETED: "setup_completed",
   DELIVERY_DEAD: "delivery_dead",
+  // console (human) auth — v0.5.0
+  CONSOLE_LOGIN: "console_login",
+  CONSOLE_LOGOUT: "console_logout",
+  CONSOLE_LOCKED: "console_locked",
+  CONSOLE_PASSWORD_SET: "console_password_set",
+  CONSOLE_TOTP_ENABLED: "console_totp_enabled",
+  CONSOLE_TOTP_DISABLED: "console_totp_disabled",
+  LINK_CREATED: "link_created",
+  LINK_CLAIMED: "link_claimed",
+  LINK_CLAIM_FAILED: "link_claim_failed",
+  SESSION_REVOKED: "session_revoked",
+  STEP_UP_OK: "step_up_ok",
+  STEP_UP_FAILED: "step_up_failed",
 } as const;
 
 const MAX_ROWS = 500;

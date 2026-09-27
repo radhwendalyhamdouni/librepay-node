@@ -7,14 +7,16 @@
  * identity → receiving wallet (validated by deriving a REAL address) →
  * payment policy → backups → LAUNCH. One click and the node is live.
  *
- * AFTER SETUP: the same page is the operator console (API-key unlock):
- * status, backups (create / download / restore / off-server SSH target),
- * and API-key rotation. No accounts — the key IS the operator.
+ * AFTER SETUP: the same page is the operator console (BTCPay-style login):
+ * a console password (+ optional TOTP 2FA) opens an HTTP-only session; the
+ * API key is for shop integrations only. Sensitive actions re-ask the
+ * password (step-up). Sessions are listed and revocable live.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { QRCodeSVG } from "qrcode.react";
 
 type Lang = "en" | "ar";
 
@@ -162,6 +164,56 @@ const T = {
     secFailed: "failed unlocks",
     secThrottled: "throttled",
     secBlocked: "SSRF blocked",
+    // console login (v0.5.0) — human credential, BTCPay-style
+    loginTitle: "Operator login",
+    loginBody:
+      "Your console password is the human credential. The API key stays with your shop integration — it never enters a browser again.",
+    loginPassword: "Console password",
+    loginTotp: "6-digit authenticator code",
+    trustDevice: "Trust this device for 30 days",
+    loginBtn: "Unlock console",
+    firstRunTitle: "Create your console password",
+    firstRunBody:
+      "Paste the operator API key once — this is the last time it ever touches a browser. Then choose a password (and optionally 2FA).",
+    firstRunKey: "Operator API key (once)",
+    firstRunPw: "New console password (min 10 chars)",
+    firstRunPw2: "Repeat the password",
+    firstRunSave: "Create password",
+    firstRunTotpTitle: "Add 2FA (recommended)",
+    firstRunTotpSkip: "Skip for now — add it later in Security",
+    firstRunTotpScan: "Scan with Google Authenticator / Aegis / 1Password, then enter the current 6-digit code:",
+    firstRunDone: "Credentials ready ✓",
+    totpCard: "Two-factor (TOTP)",
+    totpOn: "2FA is active — every console login needs your authenticator code.",
+    totpEnable: "Enable 2FA",
+    totpScan: "Scan with your authenticator app, then enter the current 6-digit code:",
+    totpConfirmBtn: "Verify & activate",
+    totpDisable: "Disable 2FA",
+    stepUpTitle: "Sensitive action — confirm it's you",
+    stepUpBody:
+      "This operation can move payments or rotate secrets. Re-enter your console password to continue.",
+    stepUpBtn: "Confirm",
+    sessionsTitle: "Signed-in sessions",
+    sessionsNote: "HTTP-only cookie · sliding expiry · revocable",
+    sessionRevoke: "revoke",
+    sessionRevokeAll: "Sign out everywhere else",
+    sessionsEmpty: "No other active sessions.",
+    sessionThisDevice: "this device",
+    sessionMethodLink: "recovery link",
+    sessionMethodKey: "api key",
+    sessionMethodPassword: "password",
+    sessionMethodFirstrun: "first-run",
+    claimFailed:
+      "That recovery link expired or was already used. Mint a new one on the server: bun run console:link",
+    claimOk: "Signed in via recovery link ✓ — set a password or continue straight to the console.",
+    lockedOut: "Too many attempts — locked. Retry in {s}s.",
+    recoveryNote: "Lost your password? On the server run: bun run console:link and open the printed link.",
+    pwMismatch: "Passwords do not match.",
+    pwCurrent: "Current password",
+    pwNew: "New password (min 10 chars)",
+    pwChangeBtn: "Change password",
+    connectKeyMasked:
+      "Shown once at setup — the node stores only its hash. Lost your copy? “Rotate API key” below mints a new one.",
   },
   ar: {
     title: "LibrePay Node",
@@ -301,10 +353,60 @@ const T = {
     secPurge: "تفريغ السجل",
     secAlert: "محاولات فتح فاشلة متعددة آخر 24 ساعة. إن لم تكن أنت، دوّر مفتاح API فوراً.",
     secChecklist: "قائمة تقوية الخادم",
-    secEvents24: "24 ساعة:",
+    secEvents24: "٢٤ ساعة:",
     secFailed: "فشل فتح",
     secThrottled: "خنق",
     secBlocked: "حجب SSRF",
+    // دخول الكونسول (v0.5.0) — هوية الإنسان بنموذج BTCPay
+    loginTitle: "دخول المشغّل",
+    loginBody:
+      "كلمة مرور الكونسول هي هويتك كإنسان. مفتاح API يبقى مع متجرك — لا يدخل المتصفح مرة أخرى.",
+    loginPassword: "كلمة مرور الكونسول",
+    loginTotp: "رمز المصادقة من 6 أرقام",
+    trustDevice: "ثق بهذا الجهاز لمدة 30 يوماً",
+    loginBtn: "افتح الكونسول",
+    firstRunTitle: "أنشئ كلمة مرور الكونسول",
+    firstRunBody:
+      "الصق مفتاح API مرة واحدة — هذه آخر مرة يلمس فيها المتصفح. ثم اختر كلمة مرور (واختيارياً 2FA).",
+    firstRunKey: "مفتاح API للمشغّل (مرة واحدة)",
+    firstRunPw: "كلمة المرور الجديدة (10 أحرف فأكثر)",
+    firstRunPw2: "أعد كلمة المرور",
+    firstRunSave: "أنشئ كلمة المرور",
+    firstRunTotpTitle: "أضف التحقق الثنائي (مستحسن)",
+    firstRunTotpSkip: "تخطَّ الآن — أضفه لاحقاً من قسم الأمان",
+    firstRunTotpScan: "امسح بـ Google Authenticator أو Aegis أو 1Password ثم أدخل الرمز الحالي من 6 أرقام:",
+    firstRunDone: "بيانات الاعتماد جاهزة ✓",
+    totpCard: "التحقق الثنائي (TOTP)",
+    totpOn: "التحقق الثنائي مفعّل — كل دخول للكونسول يحتاج رمز تطبيق المصادقة.",
+    totpEnable: "تفعيل 2FA",
+    totpScan: "امسح بتطبيق المصادقة ثم أدخل الرمز الحالي من 6 أرقام:",
+    totpConfirmBtn: "تحقق وفعّل",
+    totpDisable: "تعطيل 2FA",
+    stepUpTitle: "عملية حساسة — أكّد أنك أنت",
+    stepUpBody:
+      "هذه العملية قد تحوّل مدفوعات أو تدوّر أسراراً. أعد إدخال كلمة مرور الكونسول للمتابعة.",
+    stepUpBtn: "تأكيد",
+    sessionsTitle: "الجلسات الداخلة",
+    sessionsNote: "كوكي HttpOnly · صلاحية متجددة · قابلة للإبطال",
+    sessionRevoke: "إبطال",
+    sessionRevokeAll: "أنهِ كل الجلسات الأخرى",
+    sessionsEmpty: "لا جلسات أخرى نشطة.",
+    sessionThisDevice: "هذا الجهاز",
+    sessionMethodLink: "رابط استرجاع",
+    sessionMethodKey: "مفتاح API",
+    sessionMethodPassword: "كلمة مرور",
+    sessionMethodFirstrun: "إعداد أول",
+    claimFailed:
+      "انتهت صلاحية رابط الاسترجاع أو استُخدم سابقاً. أنشئ رابطاً جديداً من الخادم: bun run console:link",
+    claimOk: "دخلت عبر رابط الاسترجاع ✓ — ضع كلمة مرور أو تابع إلى الكونسول مباشرة.",
+    lockedOut: "محاولات كثيرة — تم القفل. أعد المحاولة بعد {s} ثانية.",
+    recoveryNote: "فقدت كلمة المرور؟ على الخادم نفّذ: bun run console:link ثم افتح الرابط المطبوع.",
+    pwMismatch: "كلمتا المرور غير متطابقتين.",
+    pwCurrent: "كلمة المرور الحالية",
+    pwNew: "كلمة المرور الجديدة (10 أحرف فأكثر)",
+    pwChangeBtn: "غيّر كلمة المرور",
+    connectKeyMasked:
+      "عُرض مرة واحدة عند الإعداد — العقدة تحفظ بصمته فقط. فقدت نسختك؟ «تدوير مفتاح API» بالأسفل ينشئ مفتاحاً جديداً.",
   },
 } as const;
 
@@ -324,6 +426,23 @@ interface SecurityData {
   encryption: Record<string, { status: string; detail: string }>;
   stats: { failed24h: number; throttled24h: number; blocked24h: number; total: number };
   events: SecEvent[];
+}
+interface ConsoleState {
+  authenticated: boolean;
+  method: string | null;
+  stepUpFresh: boolean;
+  passwordSet: boolean;
+  totpEnabled: boolean;
+}
+interface SessionRow {
+  id: string;
+  method: string;
+  ip: string;
+  userAgent: string;
+  trusted: boolean;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
 }
 interface SystemStatus {
   store: { name: string; brandColor: string };
@@ -355,7 +474,10 @@ interface SystemStatus {
 const STEP_TITLES = ["welcome", "tokenLabel", "store", "wallet", "policy", "extras", "review"] as const;
 
 export default function SetupWizard() {
-  const [lang, setLang] = useState<Lang>("en");
+  const [lang, setLang] = useState<Lang>(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("lang") === "ar") return "ar";
+    return "en";
+  });
   const t = T[lang];
   const [phase, setPhase] = useState<"loading" | "wizard" | "manage" | "done">("loading");
   const [step, setStep] = useState(0);
@@ -404,6 +526,29 @@ export default function SetupWizard() {
   const [lnMsg, setLnMsg] = useState<string | null>(null);
   const [sec, setSec] = useState<SecurityData | null>(null);
   const [showChecklist, setShowChecklist] = useState(false);
+  // ── console auth (v0.5.0): human credential + sessions + step-up ──
+  const [authMethod, setAuthMethod] = useState<"session" | "key" | null>(null);
+  const [consoleState, setConsoleState] = useState<ConsoleState | null>(null);
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginTotp, setLoginTotp] = useState("");
+  const [trustDevice, setTrustDevice] = useState(false);
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [bootstrapKey, setBootstrapKey] = useState("");
+  const [firstRunStage, setFirstRunStage] = useState<null | "password" | "totp" | "done">(null);
+  const [newPw, setNewPw] = useState("");
+  const [newPw2, setNewPw2] = useState("");
+  const [totpEnroll, setTotpEnroll] = useState<{ otpauthUri: string; secret: string } | null>(null);
+  const [totpCode, setTotpCode] = useState("");
+  const [stepUpOpen, setStepUpOpen] = useState(false);
+  const [stepUpPw, setStepUpPw] = useState("");
+  const [stepUpTotp, setStepUpTotp] = useState("");
+  const [stepUpErr, setStepUpErr] = useState<string | null>(null);
+  const pendingActionRef = useRef<(() => Promise<void>) | null>(null);
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [claimMsg, setClaimMsg] = useState<null | "failed" | "ok">(null);
+  const [pwChange, setPwChange] = useState({ current: "", next: "" });
+  const [pwChangeOpen, setPwChangeOpen] = useState(false);
 
   function copyText(id: string, value: string) {
     void navigator.clipboard.writeText(value);
@@ -411,31 +556,304 @@ export default function SetupWizard() {
     setTimeout(() => setCopied((c) => (c === id ? null : c)), 1500);
   }
 
+  // Cookie-based console calls ride the session automatically; the explicit
+  // Authorization header is only sent when a raw key is in memory (rotation flow).
+  const authHeaders = useCallback((): Record<string, string> => (apiKey ? { Authorization: `Bearer ${apiKey}` } : {}), [apiKey]);
+
+  const loadManage = useCallback(async (): Promise<boolean> => {
+    const r = await fetch("/api/system/status", { headers: authHeaders() });
+    if (r.status === 401) {
+      setError(t.errGeneric);
+      return false;
+    }
+    const data = (await r.json()) as SystemStatus;
+    setSys(data);
+    setHookList(data.webhooks?.urls ?? []);
+    const bl = await fetch("/api/system/backup", { headers: authHeaders() });
+    const bd = await bl.json();
+    setBackups(bd.backups ?? []);
+    return true;
+  }, [t, authHeaders]);
+
+  // ── boot: session cookie first, login screen second ────────────────────────
   useEffect(() => {
     setBaseUrl(window.location.origin);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("claim") === "failed") setClaimMsg("failed");
+    if (params.get("claimed")) setClaimMsg("ok");
     fetch("/api/setup/status")
       .then((r) => r.json())
-      .then((s: StatusPayload) => setPhase(s.configured ? "manage" : "wizard"))
+      .then(async (s: StatusPayload) => {
+        if (!s.configured) {
+          setPhase("wizard");
+          return;
+        }
+        try {
+          const sr = await fetch("/api/console/session");
+          const st = (await sr.json()) as ConsoleState;
+          setConsoleState(st);
+          if (st.authenticated) {
+            setAuthMethod("session");
+            if (!st.passwordSet) {
+              // firstrun / recovery session — completing the credential is
+              // MANDATORY before the console opens (no passwordless console).
+              setFirstRunStage("password");
+              setPhase("manage");
+              return;
+            }
+            const ok = await loadManage();
+            if (ok) {
+              setPhase("manage");
+              return;
+            }
+          }
+        } catch {
+          // console endpoints unreachable — fall through to the login screen
+        }
+        setPhase("manage");
+      })
       .catch(() => setPhase("wizard"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadManage = useCallback(
-    async (key: string) => {
-      const r = await fetch("/api/system/status", { headers: { Authorization: `Bearer ${key}` } });
-      if (r.status === 401) {
-        setError(t.errGeneric);
-        return false;
+  // ── console login / bootstrap / first-run ──────────────────────────────────
+  async function submitLogin() {
+    setLoginBusy(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/console/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: loginPassword, totp: loginTotp || undefined, trustDevice }),
+      });
+      const d = (await r.json().catch(() => ({}))) as { error?: string; detail?: string; retryAfter?: number };
+      if (r.ok) {
+        setAuthMethod("session");
+        setConsoleState((c) => (c ? { ...c, authenticated: true, method: "password" } : c));
+        setLoginPassword("");
+        setLoginTotp("");
+        const ok = await loadManage();
+        if (!ok) setError(t.errGeneric);
+      } else if (d.error === "LOCKED" && d.retryAfter) {
+        setError(t.lockedOut.replace("{s}", String(d.retryAfter)));
+      } else {
+        setError(d.detail ?? t.errGeneric);
       }
-      const data = (await r.json()) as SystemStatus;
-      setSys(data);
-      setHookList(data.webhooks?.urls ?? []);
-      const bl = await fetch("/api/system/backup", { headers: { Authorization: `Bearer ${key}` } });
-      const bd = await bl.json();
-      setBackups(bd.backups ?? []);
+    } finally {
+      setLoginBusy(false);
+    }
+  }
+
+  async function submitBootstrap() {
+    setLoginBusy(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/console/bootstrap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: bootstrapKey.trim() }),
+      });
+      const d = (await r.json().catch(() => ({}))) as { error?: string; detail?: string };
+      if (r.ok) {
+        setAuthMethod("session");
+        setConsoleState({ authenticated: true, method: "firstrun", stepUpFresh: false, passwordSet: false, totpEnabled: false });
+        setFirstRunStage("password");
+        setBootstrapKey("");
+      } else if (d.error === "LOCKED") {
+        setError(d.detail ?? t.errGeneric);
+      } else {
+        setError(d.detail ?? t.errGeneric);
+      }
+    } finally {
+      setLoginBusy(false);
+    }
+  }
+
+  async function saveFirstRunPassword() {
+    if (newPw !== newPw2) {
+      setError(t.pwMismatch);
+      return;
+    }
+    setLoginBusy(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/console/credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set-password", password: newPw }),
+      });
+      const d = (await r.json().catch(() => ({}))) as { error?: string; detail?: string };
+      if (r.ok) {
+        setConsoleState((c) => (c ? { ...c, passwordSet: true } : c));
+        setNewPw("");
+        setNewPw2("");
+        setFirstRunStage("totp");
+      } else {
+        setError(d.detail ?? t.errGeneric);
+      }
+    } finally {
+      setLoginBusy(false);
+    }
+  }
+
+  async function enrollTotp() {
+    const r = await fetch("/api/console/credentials", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "totp-init" }),
+    });
+    if (r.status === 403) {
+      setBusy(false);
+      openStepUp(() => enrollTotp());
+      return;
+    }
+    if (r.ok) setTotpEnroll((await r.json()) as { otpauthUri: string; secret: string });
+  }
+
+  async function confirmTotp(code: string) {
+    const r = await fetch("/api/console/credentials", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "totp-confirm", code: code.trim() }),
+    });
+    const d = (await r.json().catch(() => ({}))) as { error?: string; detail?: string };
+    if (r.ok) {
+      setTotpEnroll(null);
+      setTotpCode("");
+      setConsoleState((c) => (c ? { ...c, totpEnabled: true } : c));
       return true;
-    },
-    [t]
-  );
+    }
+    setError(d.detail ?? t.errGeneric);
+    return false;
+  }
+
+  async function finishFirstRun() {
+    setFirstRunStage(null);
+    const ok = await loadManage();
+    if (!ok) setError(t.errGeneric);
+  }
+
+  // ── step-up modal ──────────────────────────────────────────────────────────
+  function openStepUp(action: () => Promise<void>) {
+    pendingActionRef.current = action;
+    setStepUpPw("");
+    setStepUpTotp("");
+    setStepUpErr(null);
+    setStepUpOpen(true);
+  }
+
+  /** Routes 403 STEP_UP_REQUIRED into the password modal, then retries the action. */
+  function guard(res: Response, action: () => Promise<void>): boolean {
+    if (res.status === 403) {
+      setBusy(false);
+      openStepUp(action);
+      return false;
+    }
+    return true;
+  }
+
+  async function submitStepUp() {
+    setStepUpErr(null);
+    const r = await fetch("/api/console/step-up", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: stepUpPw, totp: stepUpTotp || undefined }),
+    });
+    const d = (await r.json().catch(() => ({}))) as { error?: string; detail?: string; retryAfter?: number };
+    if (r.ok) {
+      setStepUpOpen(false);
+      setConsoleState((c) => (c ? { ...c, stepUpFresh: true } : c));
+      const act = pendingActionRef.current;
+      pendingActionRef.current = null;
+      if (act) void act();
+    } else if (d.error === "LOCKED" && d.retryAfter) {
+      setStepUpErr(t.lockedOut.replace("{s}", String(d.retryAfter)));
+    } else {
+      setStepUpErr(d.detail ?? t.errGeneric);
+    }
+  }
+
+  // ── session management ─────────────────────────────────────────────────────
+  async function doLogout() {
+    setBusy(true);
+    await fetch("/api/console/logout", { method: "POST" });
+    setSys(null);
+    setApiKey("");
+    setAuthMethod(null);
+    setConsoleState(null);
+    setSessions([]);
+    setCurrentSessionId(null);
+    setFirstRunStage(null);
+    setBusy(false);
+  }
+
+  async function revokeSessionById(id: string) {
+    setBusy(true);
+    const r = await fetch("/api/console/sessions/revoke", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    if (r.ok) {
+      const d = (await r.json()) as { self?: boolean };
+      if (d.self) {
+        await doLogout();
+        setBusy(false);
+        return;
+      }
+      await loadSessions();
+    }
+    setBusy(false);
+  }
+
+  async function revokeAllOtherSessions() {
+    setBusy(true);
+    await fetch("/api/console/sessions/revoke", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ all: true }),
+    });
+    await loadSessions();
+    setBusy(false);
+  }
+
+  async function loadSessions() {
+    try {
+      const r = await fetch("/api/console/sessions", { headers: authHeaders() });
+      if (r.ok) {
+        const d = (await r.json()) as { currentId: string | null; sessions: SessionRow[] };
+        setSessions(d.sessions ?? []);
+        setCurrentSessionId(d.currentId ?? null);
+      }
+    } catch {
+      // best effort
+    }
+  }
+
+  // ── password change ────────────────────────────────────────────────────────
+  async function submitPasswordChange() {
+    if (pwChange.next !== pwChange.next.trim() || pwChange.next.length < 10) {
+      setError(t.pwNew);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const r = await fetch("/api/console/credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "set-password", password: pwChange.next.trim(), currentPassword: pwChange.current }),
+    });
+    if (!guard(r, submitPasswordChange)) return;
+    const d = (await r.json().catch(() => ({}))) as { error?: string; detail?: string };
+    if (r.ok) {
+      setPwChange({ current: "", next: "" });
+      setPwChangeOpen(false);
+      setConsoleState((c) => (c ? { ...c, stepUpFresh: true } : c));
+    } else {
+      setError(d.detail ?? t.errGeneric);
+    }
+    setBusy(false);
+  }
 
   async function launch() {
     setBusy(true);
@@ -487,16 +905,16 @@ export default function SetupWizard() {
     setBusy(true);
     await fetch("/api/system/backup", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ pushRemote: push }),
     });
-    await loadManage(apiKey);
+    await loadManage();
     setBusy(false);
   }
 
   async function download(name: string) {
     const r = await fetch(`/api/system/backup/${encodeURIComponent(name)}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
+      headers: authHeaders(),
     });
     if (!r.ok) return;
     const blob = await r.blob();
@@ -511,9 +929,10 @@ export default function SetupWizard() {
     setBusy(true);
     const r = await fetch("/api/system/backup/restore", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
     });
+    if (!guard(r, () => restore(name))) return;
     const d = await r.json();
     setStagedHint(r.ok ? d?.staged?.nextStep ?? t.restoreHint : d?.error ?? t.errGeneric);
     setBusy(false);
@@ -523,9 +942,10 @@ export default function SetupWizard() {
     setBusy(true);
     const r = await fetch("/api/system/backup/restore", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/octet-stream", "x-backup-name": file.name },
+      headers: { ...authHeaders(), "Content-Type": "application/octet-stream", "x-backup-name": file.name },
       body: await file.arrayBuffer(),
     });
+    if (!guard(r, () => restoreUpload(file))) return;
     const d = await r.json();
     setStagedHint(r.ok ? d?.staged?.nextStep ?? t.restoreHint : d?.error ?? t.errGeneric);
     setBusy(false);
@@ -533,18 +953,20 @@ export default function SetupWizard() {
 
   async function saveRemote() {
     setBusy(true);
-    await fetch("/api/system/backup/remote", {
+    const r = await fetch("/api/system/backup/remote", {
       method: "PUT",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ remoteTarget: remote.trim(), remotePort: 22, passphrase: passphrase || undefined }),
     });
-    await loadManage(apiKey);
+    if (!guard(r, saveRemote)) return;
+    await loadManage();
     setBusy(false);
   }
 
   async function rotate() {
     setBusy(true);
-    const r = await fetch("/api/setup/rotate-key", { method: "POST", headers: { Authorization: `Bearer ${apiKey}` } });
+    const r = await fetch("/api/setup/rotate-key", { method: "POST", headers: authHeaders() });
+    if (!guard(r, rotate)) return;
     const d = await r.json();
     if (r.ok) {
       setNewKey(d.apiKey);
@@ -555,22 +977,23 @@ export default function SetupWizard() {
 
   async function saveHooks() {
     setBusy(true);
-    await fetch("/api/system/webhooks", {
+    const r = await fetch("/api/system/webhooks", {
       method: "PUT",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ urls: hookList }),
     });
-    await loadManage(apiKey);
+    if (!guard(r, saveHooks)) return;
+    await loadManage();
     setBusy(false);
   }
 
-  // ── privacy / lightning / security ─────────────────────────────────────────
-  const loadSecurity = useCallback(async (key: string) => {
+  // ── privacy / lightning / security / sessions ───────────────────────────────
+  const loadSecurity = useCallback(async () => {
     try {
       const [sr, lr, pr] = await Promise.all([
-        fetch("/api/system/security", { headers: { Authorization: `Bearer ${key}` } }),
-        fetch("/api/system/lightning", { headers: { Authorization: `Bearer ${key}` } }),
-        fetch("/api/system/privacy", { headers: { Authorization: `Bearer ${key}` } }),
+        fetch("/api/system/security", { headers: authHeaders() }),
+        fetch("/api/system/lightning", { headers: authHeaders() }),
+        fetch("/api/system/privacy", { headers: authHeaders() }),
       ]);
       if (sr.ok) setSec((await sr.json()) as SecurityData);
       if (lr.ok) {
@@ -585,20 +1008,21 @@ export default function SetupWizard() {
     } catch {
       // monitor is best-effort
     }
-  }, []);
+    await loadSessions();
+  }, [authHeaders]);
 
   useEffect(() => {
-    if (!sys || !apiKey) return;
-    void loadSecurity(apiKey);
-    const iv = setInterval(() => void loadSecurity(apiKey), 15_000);
+    if (!sys) return;
+    void loadSecurity();
+    const iv = setInterval(() => void loadSecurity(), 15_000);
     return () => clearInterval(iv);
-  }, [sys, apiKey, loadSecurity]);
+  }, [sys, loadSecurity]);
 
   async function savePrivacy(mode: "standard" | "balanced" | "maximum") {
     setBusy(true);
     await fetch("/api/system/privacy", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ mode }),
     });
     setPrivacyMode(mode);
@@ -610,9 +1034,10 @@ export default function SetupWizard() {
     setLnMsg(null);
     const r = await fetch("/api/system/lightning", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ url: lnUrl.trim(), password: lnPassword }),
     });
+    if (!guard(r, connectLightning)) return;
     const d = await r.json();
     if (r.ok) {
       setLnConnected(true);
@@ -626,11 +1051,12 @@ export default function SetupWizard() {
 
   async function disconnectLightning() {
     setBusy(true);
-    await fetch("/api/system/lightning", {
+    const r = await fetch("/api/system/lightning", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ url: "-", password: "-", clear: true }),
     });
+    if (!guard(r, disconnectLightning)) return;
     setLnConnected(false);
     setLnUrl("");
     setLnMsg(null);
@@ -639,23 +1065,25 @@ export default function SetupWizard() {
 
   async function encryptNow() {
     setBusy(true);
-    await fetch("/api/system/security", {
+    const r = await fetch("/api/system/security", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ action: "encrypt-secrets" }),
     });
-    await loadSecurity(apiKey);
+    if (!guard(r, encryptNow)) return;
+    await loadSecurity();
     setBusy(false);
   }
 
   async function purgeLog() {
     setBusy(true);
-    await fetch("/api/system/security", {
+    const r = await fetch("/api/system/security", {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ action: "purge-log" }),
     });
-    await loadSecurity(apiKey);
+    if (!guard(r, purgeLog)) return;
+    await loadSecurity();
     setBusy(false);
   }
 
@@ -757,36 +1185,184 @@ export default function SetupWizard() {
         <div className="mx-auto max-w-2xl space-y-4">
           <div className="flex items-center justify-between">
             <Image src="/brand/logo-lockup.png" alt="LibrePay" width={190} height={54} priority />
-            <button
-              className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
-              onClick={() => { setApiKey(""); setSys(null); }}
-            >
-              {sys ? `🔒 ${t.logout}` : ""}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                className="rounded-md border px-2.5 py-1 text-xs hover:bg-muted"
+                onClick={() => setLang(lang === "en" ? "ar" : "en")}
+              >
+                {lang === "en" ? "العربية" : "English"}
+              </button>
+              <button
+                className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
+                onClick={doLogout}
+              >
+                {sys ? `🔒 ${t.logout}` : ""}
+              </button>
+            </div>
           </div>
 
           {!sys ? (
             <Card>
-              <h1 className="text-xl font-bold mb-4">{t.manage}</h1>
-              <span className={label}>{t.unlock}</span>
-              <input
-                dir="ltr"
-                className={`${input} font-mono`}
-                placeholder={t.keyPlaceholder}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-              <button
-                className="mt-4 w-full rounded-md bg-primary px-4 py-2.5 font-semibold text-primary-foreground hover:opacity-90"
-                onClick={async () => { setBusy(true); setError(null); const ok = await loadManage(apiKey.trim()); if (!ok) setError(t.errGeneric); setBusy(false); }}
-                disabled={busy}
-              >
-                {t.unlock} →
-              </button>
-              {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
-              <p className="mt-4 text-xs text-muted-foreground">
-                {lang === "ar" ? "لا يوجد حساب — المفتاح هو هويتك." : "No account exists — the key is your identity."}
-              </p>
+              <h1 className="text-xl font-bold mb-3">
+                {firstRunStage ? t.firstRunTitle : t.loginTitle}
+              </h1>
+
+              {claimMsg && (
+                <p
+                  className={`mb-4 rounded-md border px-3 py-2 text-xs ${
+                    claimMsg === "ok"
+                      ? "border-green-500/40 bg-green-500/10 text-green-600"
+                      : "border-amber-500/40 bg-amber-500/10 text-amber-600"
+                  }`}
+                >
+                  {claimMsg === "ok" ? `✓ ${t.claimOk}` : `⚠ ${t.claimFailed}`}
+                </p>
+              )}
+
+              {/* ── FIRST RUN: create the console password ───────────── */}
+              {firstRunStage === "password" && (
+                <>
+                  <p className="text-sm text-muted-foreground mb-4">{t.firstRunBody}</p>
+                  <span className={label}>{t.firstRunPw}</span>
+                  <input dir="ltr" type="password" className={input} value={newPw} onChange={(e) => setNewPw(e.target.value)} />
+                  <span className={`${label} mt-3`}>{t.firstRunPw2}</span>
+                  <input dir="ltr" type="password" className={input} value={newPw2} onChange={(e) => setNewPw2(e.target.value)} />
+                  <button
+                    className="mt-4 w-full rounded-md bg-primary px-4 py-2.5 font-semibold text-primary-foreground hover:opacity-90"
+                    onClick={saveFirstRunPassword}
+                    disabled={loginBusy || newPw.length < 10 || newPw !== newPw2}
+                  >
+                    {t.firstRunSave} →
+                  </button>
+                  {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+                </>
+              )}
+
+              {/* ── FIRST RUN: optional 2FA enrollment ────────────────── */}
+              {firstRunStage === "totp" && (
+                <>
+                  <p className="text-sm text-muted-foreground mb-3">✓ {t.firstRunDone}</p>
+                  <h2 className="font-semibold text-sm mb-2">{t.firstRunTotpTitle}</h2>
+                  {!totpEnroll ? (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                        onClick={enrollTotp}
+                      >
+                        {t.totpEnable}
+                      </button>
+                      <button className="rounded-md border px-4 py-2 text-sm hover:bg-muted" onClick={finishFirstRun}>
+                        {t.firstRunTotpSkip}
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground mb-3">{t.firstRunTotpScan}</p>
+                      <div className="mb-3 flex justify-center rounded-lg border bg-white p-3">
+                        <QRCodeSVG value={totpEnroll.otpauthUri} size={160} />
+                      </div>
+                      <code dir="ltr" className="mb-3 block rounded-md border bg-muted px-3 py-2 text-xs font-mono break-all">
+                        {totpEnroll.secret}
+                      </code>
+                      <input
+                        dir="ltr"
+                        inputMode="numeric"
+                        maxLength={6}
+                        className={`${input} font-mono tracking-widest`}
+                        placeholder="123456"
+                        value={totpCode}
+                        onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
+                      />
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                          disabled={totpCode.length !== 6 || loginBusy}
+                          onClick={async () => {
+                            if (await confirmTotp(totpCode)) void finishFirstRun();
+                          }}
+                        >
+                          {t.totpConfirmBtn}
+                        </button>
+                        <button className="rounded-md border px-4 py-2 text-sm hover:bg-muted" onClick={finishFirstRun}>
+                          {t.firstRunTotpSkip}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+                </>
+              )}
+
+              {/* ── BOOTSTRAP: no password yet — API key proves ownership once */}
+              {!firstRunStage && consoleState && !consoleState.passwordSet && (
+                <>
+                  <p className="text-sm text-muted-foreground mb-4">{t.firstRunBody}</p>
+                  <span className={label}>{t.firstRunKey}</span>
+                  <input
+                    dir="ltr"
+                    type="password"
+                    className={`${input} font-mono`}
+                    placeholder="lp_live_…"
+                    value={bootstrapKey}
+                    onChange={(e) => setBootstrapKey(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && bootstrapKey.trim()) void submitBootstrap(); }}
+                  />
+                  <button
+                    className="mt-4 w-full rounded-md bg-primary px-4 py-2.5 font-semibold text-primary-foreground hover:opacity-90"
+                    onClick={submitBootstrap}
+                    disabled={loginBusy || !bootstrapKey.trim()}
+                  >
+                    {t.firstRunTitle} →
+                  </button>
+                  {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+                </>
+              )}
+
+              {/* ── DAILY LOGIN: password (+ TOTP when enabled) ───────── */}
+              {!firstRunStage && consoleState?.passwordSet && (
+                <>
+                  <p className="text-sm text-muted-foreground mb-4">{t.loginBody}</p>
+                  <span className={label}>{t.loginPassword}</span>
+                  <input
+                    dir="ltr"
+                    type="password"
+                    className={input}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && loginPassword) void submitLogin(); }}
+                  />
+                  {consoleState.totpEnabled && (
+                    <>
+                      <span className={`${label} mt-3`}>{t.loginTotp}</span>
+                      <input
+                        dir="ltr"
+                        inputMode="numeric"
+                        maxLength={6}
+                        className={`${input} font-mono tracking-widest`}
+                        placeholder="123456"
+                        value={loginTotp}
+                        onChange={(e) => setLoginTotp(e.target.value.replace(/\D/g, ""))}
+                        onKeyDown={(e) => { if (e.key === "Enter" && loginPassword) void submitLogin(); }}
+                      />
+                    </>
+                  )}
+                  <label className="mt-3 flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={trustDevice} onChange={(e) => setTrustDevice(e.target.checked)} />
+                    {t.trustDevice}
+                  </label>
+                  <button
+                    className="mt-4 w-full rounded-md bg-primary px-4 py-2.5 font-semibold text-primary-foreground hover:opacity-90"
+                    onClick={submitLogin}
+                    disabled={loginBusy || !loginPassword}
+                  >
+                    {t.loginBtn} →
+                  </button>
+                  {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+                  <p className="mt-4 text-xs text-muted-foreground" dir="ltr">
+                    <code>{t.recoveryNote}</code>
+                  </p>
+                </>
+              )}
             </Card>
           ) : (
             <>
@@ -879,14 +1455,16 @@ export default function SetupWizard() {
                 <span className={label}>{t.connectKey}</span>
                 <div className="flex gap-2 mb-1">
                   <code dir="ltr" className="flex-1 rounded-md border bg-muted px-3 py-2 text-xs font-mono break-all">
-                    {apiKey ? (revealKey ? apiKey : `${apiKey.slice(0, 12)}…${apiKey.slice(-4)}`) : "lp_live_…"}
+                    {apiKey ? (revealKey ? apiKey : `${apiKey.slice(0, 12)}…${apiKey.slice(-4)}`) : "lp_live_••••••••••••••••••••"}
                   </code>
-                  <button className="rounded-md border px-3 text-xs hover:bg-muted shrink-0" onClick={() => setRevealKey((v) => !v)}>{revealKey ? t.hide : t.reveal}</button>
+                  {apiKey && (
+                    <button className="rounded-md border px-3 text-xs hover:bg-muted shrink-0" onClick={() => setRevealKey((v) => !v)}>{revealKey ? t.hide : t.reveal}</button>
+                  )}
                   {apiKey && (
                     <button className="rounded-md border px-3 text-xs hover:bg-muted shrink-0" onClick={() => copyText("key", apiKey)}>{copied === "key" ? t.copied : t.copy}</button>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mb-4">{t.connectKeyNote}</p>
+                <p className="text-xs text-muted-foreground mb-4">{apiKey ? t.connectKeyNote : t.connectKeyMasked}</p>
 
                 {sys.webhooks.secrets.length > 0 && (
                   <>
@@ -1023,6 +1601,109 @@ export default function SetupWizard() {
                   <p className="mb-4 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-600">⚠ {t.secAlert}</p>
                 )}
 
+                {/* ── CONSOLE SESSIONS (who else is inside?) ─────────────── */}
+                <div className="mb-1 flex items-center justify-between">
+                  <span className={label}>{t.sessionsTitle}</span>
+                  <button
+                    className="rounded border px-2 py-0.5 text-[10px] hover:bg-muted"
+                    disabled={busy || sessions.length <= 1}
+                    onClick={revokeAllOtherSessions}
+                  >
+                    {t.sessionRevokeAll}
+                  </button>
+                </div>
+                <p className="mb-2 text-[10px] text-muted-foreground">{t.sessionsNote}</p>
+                <ul className="mb-5 space-y-1">
+                  {sessions.map((s) => (
+                    <li key={s.id} className="flex items-center justify-between gap-2 rounded-md border px-3 py-1.5 text-xs">
+                      <div className="min-w-0">
+                        <span className="font-medium">
+                          {s.method === "link" ? t.sessionMethodLink : s.method === "key" ? t.sessionMethodKey : s.method === "firstrun" ? t.sessionMethodFirstrun : t.sessionMethodPassword}
+                        </span>
+                        {s.id === currentSessionId && (
+                          <span className="ms-2 rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-semibold text-green-600">{t.sessionThisDevice}</span>
+                        )}
+                        <span className="ms-2 text-muted-foreground">{s.ip} · {new Date(s.lastSeenAt).toLocaleString()}</span>
+                      </div>
+                      {s.id !== currentSessionId && (
+                        <button className="shrink-0 rounded border px-2 py-0.5 text-[10px] hover:bg-muted" disabled={busy} onClick={() => revokeSessionById(s.id)}>
+                          {t.sessionRevoke}
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                  {sessions.length === 0 && (
+                    <li className="rounded-md border px-3 py-2 text-xs text-muted-foreground">{t.sessionsEmpty}</li>
+                  )}
+                </ul>
+
+                {/* ── 2FA (TOTP) ─────────────────────────────────────────── */}
+                <div className="mb-1 flex items-center justify-between">
+                  <span className={label}>{t.totpCard}</span>
+                  {consoleState?.totpEnabled ? (
+                    <span className="rounded-full border border-green-500/40 bg-green-500/10 px-2 py-0.5 text-[10px] font-semibold text-green-600">✓ ON</span>
+                  ) : (
+                    <button
+                      className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
+                      disabled={busy || !consoleState?.passwordSet}
+                      onClick={() => (consoleState?.stepUpFresh ? enrollTotp() : openStepUp(enrollTotp))}
+                    >
+                      {t.totpEnable}
+                    </button>
+                  )}
+                </div>
+                {consoleState?.totpEnabled && <p className="mb-3 text-xs text-muted-foreground">{t.totpOn}</p>}
+                {totpEnroll && !consoleState?.totpEnabled && (
+                  <div className="mb-4 rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground mb-2">{t.totpScan}</p>
+                    <div className="mb-2 flex justify-center rounded-lg border bg-white p-3">
+                      <QRCodeSVG value={totpEnroll.otpauthUri} size={140} />
+                    </div>
+                    <code dir="ltr" className="mb-2 block rounded-md border bg-muted px-3 py-2 text-xs font-mono break-all">
+                      {totpEnroll.secret}
+                    </code>
+                    <input
+                      dir="ltr"
+                      inputMode="numeric"
+                      maxLength={6}
+                      className={`${input} mb-2 font-mono tracking-widest`}
+                      placeholder="123456"
+                      value={totpCode}
+                      onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
+                    />
+                    <button
+                      className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
+                      disabled={totpCode.length !== 6 || busy}
+                      onClick={async () => {
+                        if (await confirmTotp(totpCode)) setTotpEnroll(null);
+                      }}
+                    >
+                      {t.totpConfirmBtn}
+                    </button>
+                  </div>
+                )}
+
+                {/* ── PASSWORD CHANGE ────────────────────────────────────── */}
+                <div className="mb-1 flex items-center justify-between">
+                  <span className={label}>🔑 {t.pwChangeBtn}</span>
+                  <button className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted" disabled={busy} onClick={() => setPwChangeOpen((v) => !v)}>
+                    {pwChangeOpen ? "▴" : "▾"}
+                  </button>
+                </div>
+                {pwChangeOpen && (
+                  <div className="mb-4">
+                    <input dir="ltr" type="password" className={`${input} mb-2`} placeholder={t.pwCurrent} value={pwChange.current} onChange={(e) => setPwChange({ ...pwChange, current: e.target.value })} />
+                    <input dir="ltr" type="password" className={`${input} mb-2`} placeholder={t.pwNew} value={pwChange.next} onChange={(e) => setPwChange({ ...pwChange, next: e.target.value })} />
+                    <button
+                      className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
+                      disabled={busy || !pwChange.current || pwChange.next.length < 10}
+                      onClick={submitPasswordChange}
+                    >
+                      {t.pwChangeBtn}
+                    </button>
+                  </div>
+                )}
+
                 <div className="mb-2 flex items-center justify-between">
                   <span className={label}>{t.secEnc}</span>
                   {sec && (sec.encryption.phoenixdPassword.status === "plaintext" || sec.encryption.backupPassphrase.status === "plaintext") && (
@@ -1154,6 +1835,53 @@ export default function SetupWizard() {
                   <code className="mt-3 block rounded-md border bg-muted px-3 py-2 text-xs font-mono break-all">{newKey}</code>
                 )}
               </Card>
+              {/* ── STEP-UP MODAL (sensitive actions re-ask the password) ── */}
+              {stepUpOpen && (
+                <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={() => setStepUpOpen(false)}>
+                  <div
+                    className="w-full max-w-sm rounded-2xl border bg-card p-6 shadow-xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <h3 className="mb-1 text-lg font-bold">🛡️ {t.stepUpTitle}</h3>
+                    <p className="mb-4 text-sm text-muted-foreground">{t.stepUpBody}</p>
+                    <input
+                      dir="ltr"
+                      type="password"
+                      autoFocus
+                      className={`${input} mb-2`}
+                      placeholder={t.loginPassword}
+                      value={stepUpPw}
+                      onChange={(e) => setStepUpPw(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && stepUpPw) void submitStepUp(); }}
+                    />
+                    {consoleState?.totpEnabled && (
+                      <input
+                        dir="ltr"
+                        inputMode="numeric"
+                        maxLength={6}
+                        className={`${input} mb-2 font-mono tracking-widest`}
+                        placeholder="123456"
+                        value={stepUpTotp}
+                        onChange={(e) => setStepUpTotp(e.target.value.replace(/\D/g, ""))}
+                      />
+                    )}
+                    {stepUpErr && <p className="mb-2 text-sm text-destructive">{stepUpErr}</p>}
+                    <div className="flex gap-2">
+                      <button
+                        className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                        disabled={!stepUpPw}
+                        onClick={submitStepUp}
+                      >
+                        {t.stepUpBtn}
+                      </button>
+                      <button className="rounded-md border px-4 py-2 text-sm hover:bg-muted" onClick={() => setStepUpOpen(false)}>
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="pb-8 text-center">
                 <Link href="/" className="text-xs text-muted-foreground underline">← {t.goFront}</Link>
               </div>

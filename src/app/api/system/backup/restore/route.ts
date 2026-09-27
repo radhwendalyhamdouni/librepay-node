@@ -8,7 +8,11 @@
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { authenticateApiKey } from "@/lib/server/api-auth";
+import {
+  authenticateConsole,
+  stepUpSatisfied,
+  STEP_UP_REQUIRED,
+} from "@/lib/server/console-auth";
 import { stageRestore, stageRestoreFromUpload } from "@/lib/server/backup";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +20,12 @@ export const dynamic = "force-dynamic";
 const nameSchema = z.object({ name: z.string().min(5).max(120) });
 
 export async function POST(req: Request) {
-  const auth = await authenticateApiKey(req);
+  const auth = await authenticateConsole(req);
   if (!auth) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  // STEP-UP: a restore can replace every operator setting — re-ask the password.
+  if (!stepUpSatisfied(auth)) {
+    return NextResponse.json(STEP_UP_REQUIRED, { status: 403 });
+  }
 
   const contentType = req.headers.get("content-type") ?? "";
   try {

@@ -9,7 +9,7 @@
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { authenticateApiKey } from "@/lib/server/api-auth";
+import { authenticateConsole } from "@/lib/server/console-auth";
 import { getSettings, saveSettings } from "@/lib/server/settings";
 
 export const dynamic = "force-dynamic";
@@ -19,14 +19,14 @@ const bodySchema = z.object({
 });
 
 export async function GET(req: Request) {
-  if (!(await authenticateApiKey(req))) {
+  if (!(await authenticateConsole(req))) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
   return NextResponse.json({ ok: true, mode: getSettings().privacyMode });
 }
 
 export async function POST(req: Request) {
-  if (!(await authenticateApiKey(req))) {
+  if (!(await authenticateConsole(req))) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
   const body = bodySchema.safeParse(await req.json().catch(() => ({})));

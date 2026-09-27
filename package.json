@@ -1,6 +1,6 @@
 {
   "name": "librepay-node",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": false,
   "description": "Self-hosted, non-custodial Bitcoin payment gateway \u2014 on-chain stealth addresses + instant Lightning (phoenixd). No accounts. No KYC. AGPL-3.0.",
   "homepage": "https://github.com/radhwendalyhamdouni/librepay-node#readme",
@@ -30,6 +30,9 @@
     "start": "NODE_ENV=production node .next/standalone/server.js",
     "start:bun": "NODE_ENV=production bun .next/standalone/server.js",
     "setup": "bun scripts/setup.ts",
+    "console:link": "bun scripts/console-admin.ts",
+    "console:revoke-all": "bun scripts/console-admin.ts --revoke-all",
+    "console:reset-password": "bun scripts/console-admin.ts --reset-password",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "lint": "eslint .",

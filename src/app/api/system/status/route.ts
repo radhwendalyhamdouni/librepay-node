@@ -8,7 +8,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { authenticateApiKey } from "@/lib/server/api-auth";
+import { authenticateConsole } from "@/lib/server/console-auth";
 import { getMerchant } from "@/lib/config";
 import { getSettings } from "@/lib/server/settings";
 import { backupStatus, listBackups } from "@/lib/server/backup";
@@ -17,7 +17,7 @@ import { env } from "@/lib/env";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const auth = await authenticateApiKey(req);
+  const auth = await authenticateConsole(req);
   if (!auth) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
 
   const me = getMerchant();

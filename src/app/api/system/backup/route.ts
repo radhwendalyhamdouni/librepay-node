@@ -5,19 +5,19 @@
  */
 
 import { NextResponse } from "next/server";
-import { authenticateApiKey } from "@/lib/server/api-auth";
+import { authenticateConsole } from "@/lib/server/console-auth";
 import { createBackup, listBackups, pushRemote } from "@/lib/server/backup";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const auth = await authenticateApiKey(req);
+  const auth = await authenticateConsole(req);
   if (!auth) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   return NextResponse.json({ backups: listBackups() });
 }
 
 export async function POST(req: Request) {
-  const auth = await authenticateApiKey(req);
+  const auth = await authenticateConsole(req);
   if (!auth) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   const body = await req.json().catch(() => ({}));
   try {

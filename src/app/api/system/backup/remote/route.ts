@@ -8,7 +8,11 @@
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { authenticateApiKey } from "@/lib/server/api-auth";
+import {
+  authenticateConsole,
+  stepUpSatisfied,
+  STEP_UP_REQUIRED,
+} from "@/lib/server/console-auth";
 import { pushRemote } from "@/lib/server/backup";
 import { getSettings, saveSettings } from "@/lib/server/settings";
 import { encryptServerSecret } from "@/lib/server/crypto-server";
@@ -30,8 +34,12 @@ const bodySchema = z.object({
 });
 
 export async function PUT(req: Request) {
-  const auth = await authenticateApiKey(req);
+  const auth = await authenticateConsole(req);
   if (!auth) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  // STEP-UP: redirecting backups (or their passphrase) is an operator-level change.
+  if (!stepUpSatisfied(auth)) {
+    return NextResponse.json(STEP_UP_REQUIRED, { status: 403 });
+  }
 
   const body = bodySchema.safeParse(await req.json().catch(() => ({})));
   if (!body.success) {

@@ -74,6 +74,22 @@ export default function DocsPage() {
         </section>
 
         <section className="space-y-3">
+          <h2 className="text-xl font-semibold">Console access (operator login)</h2>
+          <p className="text-sm text-muted-foreground">
+            The human credential and the machine credential never mix — same model as BTCPay Server.
+            The shop keeps using the <code className="mx-1">lp_live_…</code> API key; YOU log in with a
+            console password (+ optional TOTP 2FA). The API key never has to enter a browser.
+          </p>
+          <ul className="list-disc list-inside space-y-1.5 text-sm text-muted-foreground">
+            <li><b>First time:</b> open <code>/setup</code> → paste the operator API key once → create your console password → scan the QR to enable 2FA (recommended).</li>
+            <li><b>Everyday:</b> password + 6-digit authenticator code. Sessions are HTTP-only cookies (8h sliding, or 30 days with “trust this device”), listed and revocable live in <b>Security</b>.</li>
+            <li><b>Step-up:</b> rotating the API key, changing webhook destinations, restoring backups or changing credentials re-asks your password — a stolen cookie can read, never redirect.</li>
+            <li><b>Lost password?</b> On the server run <code>bun run console:link</code> and open the printed one-time link (server access = proof of ownership), or <code>bun run console:reset-password</code> to start over. <code>bun run console:revoke-all</code> kills every session instantly.</li>
+            <li><b>Brute force:</b> 5 failed attempts lock the source IP for 15 minutes, doubling per repeat (cap 24h); every attempt lands on the live security monitor.</li>
+          </ul>
+        </section>
+
+        <section className="space-y-3">
           <h2 className="text-xl font-semibold">Webhooks</h2>
           <p className="text-sm text-muted-foreground">
             Every lifecycle transition is POSTed to every URL configured in

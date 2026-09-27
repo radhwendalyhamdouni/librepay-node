@@ -90,6 +90,38 @@ model WebhookDelivery {
   @@index([invoiceId])
 }
 
+// Operator console sessions — the HTTP-only cookie identity ("the best way in",
+// BTCPay-style: human credential ≠ API credential). Only sha256 hashes of the
+// session tokens are stored; the raw token exists solely inside the cookie.
+model ConsoleSession {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  method     String    @default("password") // password | link | firstrun
+  ip         String    @default("-")
+  userAgent  String    @default("")
+  trusted    Boolean   @default(false) // false = 8h sliding · true = 30d sliding
+  stepUpAt   DateTime? // last password re-confirmation (sensitive-action gate)
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+
+  @@index([expiresAt])
+}
+
+// One-time recovery links minted by `bun run console:link` — server access is
+// the proof of ownership when the password is lost or a new device arrives.
+model ConsoleLinkToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+  usedIp    String    @default("-")
+
+  @@index([expiresAt])
+}
+
 // Operator security monitor — the console's live "who knocked on my door".
 // Records auth failures (key guessing), SSRF blocks, sensitive actions and
 // delivery deaths. No secrets, no payloads — IP + type + short detail only.

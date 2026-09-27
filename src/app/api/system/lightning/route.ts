@@ -8,7 +8,11 @@
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { authenticateApiKey } from "@/lib/server/api-auth";
+import {
+  authenticateConsole,
+  stepUpSatisfied,
+  STEP_UP_REQUIRED,
+} from "@/lib/server/console-auth";
 import { getSettings, saveSettings, resolveLightningPassword } from "@/lib/server/settings";
 import { encryptServerSecret } from "@/lib/server/crypto-server";
 import { phoenixdGetInfo } from "@/lib/server/lightning";
@@ -23,7 +27,7 @@ const bodySchema = z.object({
 });
 
 export async function GET(req: Request) {
-  if (!(await authenticateApiKey(req))) {
+  if (!(await authenticateConsole(req))) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
   const s = getSettings();
@@ -37,8 +41,13 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  if (!(await authenticateApiKey(req))) {
+  const auth = await authenticateConsole(req);
+  if (!auth) {
     return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+  // STEP-UP: connecting/disconnecting a node stores a credential.
+  if (!stepUpSatisfied(auth)) {
+    return NextResponse.json(STEP_UP_REQUIRED, { status: 403 });
   }
 
   const body = bodySchema.safeParse(await req.json().catch(() => ({})));
