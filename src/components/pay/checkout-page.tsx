@@ -67,11 +67,14 @@ export function CheckoutPage({ invoiceId }: { invoiceId: string }) {
 
   // language priority: ?lang= > localStorage > invoice.buyerLang > en
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get("lang");
-    if (q && detectLang(q)) { setLang(detectLang(q)); return; }
-    const stored = localStorage.getItem("librepay-lang");
-    if (stored && detectLang(stored)) { setLang(detectLang(stored)); return; }
-    if (inv?.buyerLang) setLang(inv.buyerLang);
+    // Storage/URL reads run in a microtask — no synchronous setState in the effect body.
+    queueMicrotask(() => {
+      const q = new URLSearchParams(window.location.search).get("lang");
+      if (q && detectLang(q)) { setLang(detectLang(q)); return; }
+      const stored = localStorage.getItem("librepay-lang");
+      if (stored && detectLang(stored)) { setLang(detectLang(stored)); return; }
+      if (inv?.buyerLang) setLang(inv.buyerLang);
+    });
   }, [inv?.buyerLang]);
 
   useEffect(() => {
@@ -105,7 +108,7 @@ export function CheckoutPage({ invoiceId }: { invoiceId: string }) {
   }, [invoiceId]);
 
   useEffect(() => {
-    void load();
+    queueMicrotask(() => void load());
     const iv = setInterval(() => void load(), 7_000);
     return () => clearInterval(iv);
   }, [load]);
@@ -119,7 +122,9 @@ export function CheckoutPage({ invoiceId }: { invoiceId: string }) {
 
   // default to Lightning tab when both rails exist (fastest UX); buyer can switch
   useEffect(() => {
-    if (inv && !inv.lightningAvailable && rail === "lightning") setRail("onchain");
+    queueMicrotask(() => {
+      if (inv && !inv.lightningAvailable && rail === "lightning") setRail("onchain");
+    });
   }, [inv?.lightningAvailable, rail, inv]);
 
   const remaining = useMemo(() => {
@@ -234,7 +239,6 @@ export function CheckoutPage({ invoiceId }: { invoiceId: string }) {
         {/* merchant header */}
         <div className="mb-6 text-center">
           {inv.merchant.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={inv.merchant.logoUrl}
               alt={inv.merchant.name}

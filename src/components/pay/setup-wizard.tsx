@@ -13,7 +13,7 @@
  * password (step-up). Sessions are listed and revocable live.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
@@ -481,6 +481,31 @@ interface SystemStatus {
 
 const STEP_TITLES = ["welcome", "tokenLabel", "store", "wallet", "policy", "extras", "review"] as const;
 
+// ── shared bits (module scope — components must never be created during render) ──
+function Card({ children }: { children: ReactNode }) {
+  return (
+    <div className="w-full max-w-xl rounded-2xl border bg-card p-6 sm:p-8 shadow-lg">
+      {children}
+    </div>
+  );
+}
+
+function Badge({ kind, t }: { kind: "req" | "opt" | "rec"; t: (typeof T)[Lang] }) {
+  return (
+    <span
+      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+        kind === "req"
+          ? "border-orange-500/40 bg-orange-500/10 text-orange-600"
+          : kind === "rec"
+            ? "border-green-500/40 bg-green-500/10 text-green-600"
+            : "border-muted-foreground/30 bg-muted text-muted-foreground"
+      }`}
+    >
+      {kind === "req" ? t.badgeRequired : kind === "rec" ? t.badgeRecommended : t.badgeOptional}
+    </span>
+  );
+}
+
 export default function SetupWizard() {
   const [lang, setLang] = useState<Lang>(() => {
     if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("lang") === "ar") return "ar";
@@ -586,10 +611,14 @@ export default function SetupWizard() {
 
   // ── boot: session cookie first, login screen second ────────────────────────
   useEffect(() => {
-    setBaseUrl(window.location.origin);
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("claim") === "failed") setClaimMsg("failed");
-    if (params.get("claimed")) setClaimMsg("ok");
+    // Browser-only values (origin, query params) are read inside a microtask —
+    // never setState synchronously in the effect body.
+    queueMicrotask(() => {
+      setBaseUrl(window.location.origin);
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("claim") === "failed") setClaimMsg("failed");
+      if (params.get("claimed")) setClaimMsg("ok");
+    });
     fetch("/api/setup/status")
       .then((r) => r.json())
       .then(async (s: StatusPayload) => {
@@ -622,7 +651,6 @@ export default function SetupWizard() {
         setPhase("manage");
       })
       .catch(() => setPhase("wizard"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── console login / bootstrap / first-run ──────────────────────────────────
@@ -1040,7 +1068,7 @@ export default function SetupWizard() {
 
   useEffect(() => {
     if (!sys) return;
-    void loadSecurity();
+    queueMicrotask(() => void loadSecurity());
     const iv = setInterval(() => void loadSecurity(), 15_000);
     return () => clearInterval(iv);
   }, [sys, loadSecurity]);
@@ -1115,11 +1143,6 @@ export default function SetupWizard() {
   }
 
   // ── shared bits ───────────────────────────────────────────────────────────
-  const Card = ({ children }: { children: React.ReactNode }) => (
-    <div className="w-full max-w-xl rounded-2xl border bg-card p-6 sm:p-8 shadow-lg">
-      {children}
-    </div>
-  );
   const statusPill = (s: string) =>
     s === "settled" || s === "confirmed"
       ? "border-green-500/30 bg-green-500/10 text-green-600"
@@ -1130,19 +1153,6 @@ export default function SetupWizard() {
           : s === "underpaid"
             ? "border-amber-500/30 bg-amber-500/10 text-amber-600"
             : "border-border bg-muted text-muted-foreground";
-  const Badge = ({ kind }: { kind: "req" | "opt" | "rec" }) => (
-    <span
-      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-        kind === "req"
-          ? "border-orange-500/40 bg-orange-500/10 text-orange-600"
-          : kind === "rec"
-            ? "border-green-500/40 bg-green-500/10 text-green-600"
-            : "border-muted-foreground/30 bg-muted text-muted-foreground"
-      }`}
-    >
-      {kind === "req" ? t.badgeRequired : kind === "rec" ? t.badgeRecommended : t.badgeOptional}
-    </span>
-  );
   const secEventColor = (sev: string) =>
     sev === "critical"
       ? "border-purple-500/40 bg-purple-500/10 text-purple-500"
@@ -1407,7 +1417,7 @@ export default function SetupWizard() {
               <Card>
                 <div className="mb-1 flex items-center justify-between">
                   <h2 className="text-lg font-bold">🛡️ {t.privacyTitle}</h2>
-                  <Badge kind="rec" />
+                  <Badge kind="rec" t={t} />
                 </div>
                 <p className="text-sm text-muted-foreground mb-4">{t.privacyIntro}</p>
                 <div className="space-y-2">
@@ -1570,7 +1580,7 @@ export default function SetupWizard() {
               <Card>
                 <div className="mb-1 flex items-center justify-between">
                   <h2 className="text-lg font-bold">⚡ {t.lnTitle}</h2>
-                  <Badge kind="opt" />
+                  <Badge kind="opt" t={t} />
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">{t.lnIntro}</p>
                 <div className="mb-4 flex items-center gap-2 text-sm">
@@ -1985,7 +1995,7 @@ export default function SetupWizard() {
           <>
             <div className="mb-1 flex items-center gap-2">
               <h1 className="text-xl font-bold mb-4">🏪 {t.store}</h1>
-              <Badge kind="req" />
+              <Badge kind="req" t={t} />
             </div>
             <span className={label}>{t.storeName}</span>
             <input className={`${input} mb-4`} placeholder="Satoshi Coffee" value={storeName} onChange={(e) => setStoreName(e.target.value)} />
@@ -2001,7 +2011,7 @@ export default function SetupWizard() {
           <>
             <div className="mb-1 flex items-center gap-2">
               <h1 className="text-xl font-bold mb-1">👛 {t.wallet}</h1>
-              <Badge kind="req" />
+              <Badge kind="req" t={t} />
             </div>
             <p className="mb-4 text-sm text-muted-foreground">{t.walletBody}</p>
             <div className="mb-4 grid grid-cols-2 gap-2">
@@ -2038,7 +2048,7 @@ export default function SetupWizard() {
           <>
             <div className="mb-1 flex items-center gap-2">
               <h1 className="text-xl font-bold mb-4">⏱ {t.policy}</h1>
-              <Badge kind="rec" />
+              <Badge kind="rec" t={t} />
             </div>
             <span className={label}>
               {t.confirmations}: <b>{confirmations}</b> {t.confirmationsUnit}

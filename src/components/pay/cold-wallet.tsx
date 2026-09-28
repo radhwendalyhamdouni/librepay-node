@@ -154,12 +154,15 @@ export function ColdWallet() {
 
   // honor ?lang= / localStorage like the rest of the node
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get("lang");
-    if (q === "ar" || q === "en") setLang(q);
-    else {
-      const stored = window.localStorage.getItem("lp_lang");
-      if (stored === "ar" || stored === "en") setLang(stored);
-    }
+    // Storage/URL reads run in a microtask — no synchronous setState in the effect body.
+    queueMicrotask(() => {
+      const q = new URLSearchParams(window.location.search).get("lang");
+      if (q === "ar" || q === "en") setLang(q);
+      else {
+        const stored = window.localStorage.getItem("lp_lang");
+        if (stored === "ar" || stored === "en") setLang(stored);
+      }
+    });
   }, []);
 
   const mnemonicWords = useMemo(() => (wallet ? wallet.mnemonic.split(" ") : []), [wallet]);
