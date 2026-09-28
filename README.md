@@ -16,6 +16,11 @@ for your shop — and **zero accounts, zero KYC, zero custodial risk**.
 
 [English](#-one-command-install) · [العربية](#-التثبيت-بأمر-واحد)
 
+🌐 **Project home: [librepay.tech](https://librepay.tech)** — the five-language
+landing page (🇺🇸 · 🇸🇦 · 🇫🇷 · 🇪🇸 · 🇵🇹) explaining what the project is, why it
+exists, who it is for and why it is free forever. Same flags, same story, same
+code.
+
 ---
 
 ## ⚡ One-command install
