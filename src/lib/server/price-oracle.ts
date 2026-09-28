@@ -42,7 +42,11 @@ async function fetchJson<T>(url: string, timeoutMs = 6_000): Promise<T | null> {
 }
 
 async function fromMempool(): Promise<PriceQuote | null> {
-  const data = await fetchJson<Record<string, number>>(`${env.ESPLORA_API}/v1/prices`);
+  // BTC's fiat price is chain-independent — on a testnet node (whose Esplora
+  // may not serve /v1/prices) pull the quote from the mainnet API instead.
+  const url =
+    env.NETWORK === "testnet" ? "https://mempool.space/api/v1/prices" : `${env.ESPLORA_API}/v1/prices`;
+  const data = await fetchJson<Record<string, number>>(url);
   if (!data || typeof data.USD !== "number" || data.USD <= 0) return null;
   const { time: _time, ...rates } = data;
   return { usdPerBtc: data.USD, source: "mempool.space", ts: Date.now(), rates };

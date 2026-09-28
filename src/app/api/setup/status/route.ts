@@ -6,6 +6,7 @@
 
 import { NextResponse } from "next/server";
 import { getSetupToken, isConfigured } from "@/lib/server/settings";
+import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -20,5 +21,6 @@ export async function GET() {
     configured,
     setupRequired: !configured,
     tokenPath: configured ? null : "data/SETUP_TOKEN",
+    network: env.NETWORK, // "mainnet" | "testnet" — tools (cold wallet, wizard) align their derivation
   });
 }

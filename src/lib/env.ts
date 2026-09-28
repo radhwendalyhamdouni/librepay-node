@@ -6,9 +6,15 @@
  * but the payment rail stays DARK until a wallet is configured.
  */
 
+import { parseNetwork, type Network } from "./network";
+
 const bool = (v: string | undefined) => v === "true" || v === "1";
 
 export const env = {
+  /** "mainnet" (default) or "testnet" (= testnet4) — flips HRP, key flavors and Esplora together */
+  get NETWORK(): Network {
+    return parseNetwork(process.env.LP_NETWORK);
+  },
   /** Public base URL of this node (https://pay.example.com) — no trailing slash */
   get BASE_URL() {
     return (process.env.LP_BASE_URL ?? "").replace(/\/+$/, "");
@@ -100,8 +106,11 @@ export const env = {
   },
 
   // ── infra ──
+  /** Esplora-compatible chain API. Default follows LP_NETWORK: mainnet →
+   *  mempool.space/api, testnet → mempool.space/testnet4/api. */
   get ESPLORA_API() {
-    return process.env.ESPLORA_API ?? "https://mempool.space/api";
+    if (process.env.ESPLORA_API) return process.env.ESPLORA_API;
+    return this.NETWORK === "testnet" ? "https://mempool.space/testnet4/api" : "https://mempool.space/api";
   },
   get DATABASE_URL() {
     return process.env.DATABASE_URL ?? "file:./data/node.db";

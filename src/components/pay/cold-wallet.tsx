@@ -26,6 +26,7 @@ import {
   pubkeyToBech32Address,
 } from "@/lib/server/keys";
 import { HDKey } from "@scure/bip32";
+import { hrpFor, coinTypeFor, type Network } from "@/lib/network";
 
 type Lang = "en" | "ar";
 
@@ -69,6 +70,10 @@ const T: Record<Lang, Record<string, string>> = {
     copied: "Copied",
     notStored: "Nothing here is stored. Leaving or reloading this page erases the keys from memory.",
     generatedOffline: "Generated in this tab",
+    testnetBadge: "TESTNET4 — no real money, keys still real: store them safely",
+    zpubTitleTestnet: "vpub — watch-only (BIP84 testnet4)",
+    zpubNoteTestnet:
+      "Alternative to the payment code: standard BIP84 testnet watch-only key for Sparrow/Electrum testnet. Funds land in tb1… addresses.",
   },
   ar: {
     title: "مولّد المحفظة الباردة",
@@ -109,6 +114,10 @@ const T: Record<Lang, Record<string, string>> = {
     copied: "تم النسخ",
     notStored: "لا يُخزَّن أي شيء هنا. مغادرة الصفحة أو إعادة تحميلها تمحو المفاتيح من الذاكرة.",
     generatedOffline: "توليد محلي في هذا التبويب",
+    testnetBadge: "شبكة تجريبية TESTNET4 — لا أموال حقيقية، لكن المفاتيح حقيقية: احفظها بأمان",
+    zpubTitleTestnet: "vpub — مشاهدة فقط (BIP84 testnet4)",
+    zpubNoteTestnet:
+      "بديل عن رمز الدفع: مفتاح BIP84 تجريبي قياسي للمشاهدة فقط يعمل مع Sparrow/Electrum على الشبكة التجريبية. تصل الأموال إلى عناوين tb1….",
   },
 };
 
@@ -121,21 +130,24 @@ interface WalletOut {
   firstAddress: string;
   wifScan: string;
   wifSpend: string;
+  network: Network;
 }
 
-function buildWallet(mnemonic: string): WalletOut {
+function buildWallet(mnemonic: string, network: Network = "mainnet"): WalletOut {
   const seed = seedFromMnemonic(mnemonic);
-  const k = deriveWalletKeys(seed);
-  // first liquid address for the zpub rail (sanity check against Sparrow/Electrum)
-  const first = HDKey.fromMasterSeed(seed).derive(FIRST_ADDR_PATH);
+  const k = deriveWalletKeys(seed, network);
+  // first liquid address for the zpub/vpub rail (sanity check against Sparrow/Electrum)
+  const path = FIRST_ADDR_PATH.replace("m/84'/0'", `m/84'/${coinTypeFor(network)}'`);
+  const first = HDKey.fromMasterSeed(seed).derive(path);
   if (!first.publicKey) throw new Error("derivation failed");
   return {
     mnemonic: normalizeMnemonic(mnemonic),
     paymentCode: k.paymentCode,
     accountZpub: k.accountZpub,
-    firstAddress: pubkeyToBech32Address(first.publicKey),
-    wifScan: toWIF(k.scanPriv),
-    wifSpend: toWIF(k.spendPriv),
+    firstAddress: pubkeyToBech32Address(first.publicKey, hrpFor(network)),
+    wifScan: toWIF(k.scanPriv, network),
+    wifSpend: toWIF(k.spendPriv, network),
+    network,
   };
 }
 
@@ -151,6 +163,7 @@ export function ColdWallet() {
   const [error, setError] = useState<string | null>(null);
   const [showWords, setShowWords] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
+  const [network, setNetwork] = useState<Network>("mainnet");
 
   // honor ?lang= / localStorage like the rest of the node
   useEffect(() => {
@@ -163,6 +176,24 @@ export function ColdWallet() {
         if (stored === "ar" || stored === "en") setLang(stored);
       }
     });
+  }, []);
+
+  // Align derivation with the node's LP_NETWORK. Best-effort fetch to the
+  // node's own public status endpoint — OFFLINE USE IS UNAFFECTED: when the
+  // request fails (air-gapped tab) we silently keep mainnet defaults.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/setup/status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!cancelled && j?.network === "testnet") setNetwork("testnet");
+      })
+      .catch(() => {
+        /* offline / air-gapped — mainnet defaults are fine */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const mnemonicWords = useMemo(() => (wallet ? wallet.mnemonic.split(" ") : []), [wallet]);
@@ -180,7 +211,7 @@ export function ColdWallet() {
     setError(null);
     try {
       setShowWords(true);
-      setWallet(buildWallet(newMnemonic(words)));
+      setWallet(buildWallet(newMnemonic(words), network));
     } catch (e) {
       setError(e instanceof Error ? e.message : "generation failed");
     }
@@ -195,7 +226,7 @@ export function ColdWallet() {
     }
     try {
       setShowWords(true);
-      setWallet(buildWallet(m));
+      setWallet(buildWallet(m, network));
     } catch (e) {
       setError(e instanceof Error ? e.message : "restore failed");
     }
@@ -256,6 +287,13 @@ export function ColdWallet() {
           </p>
           <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{t.offlineBody}</p>
         </div>
+
+        {/* network badge — appears only when the node runs LP_NETWORK=testnet */}
+        {network === "testnet" && (
+          <div className="mb-8 rounded-lg border border-sky-500/40 bg-sky-500/10 p-3">
+            <p className="text-sm font-semibold text-sky-600 dark:text-sky-400">🧪 {t.testnetBadge}</p>
+          </div>
+        )}
 
         {/* mode switch */}
         <div className="mb-6 grid grid-cols-2 gap-2">
@@ -361,8 +399,12 @@ export function ColdWallet() {
 
             {/* zpub + first address */}
             <section className="rounded-lg border p-4">
-              <h2 className="mb-1 text-sm font-bold">{t.zpubTitle}</h2>
-              <p className="mb-3 text-xs leading-relaxed text-muted-foreground">{t.zpubNote}</p>
+              <h2 className="mb-1 text-sm font-bold">
+                {network === "testnet" ? t.zpubTitleTestnet : t.zpubTitle}
+              </h2>
+              <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
+                {network === "testnet" ? t.zpubNoteTestnet : t.zpubNote}
+              </p>
               <div dir="ltr" className={monoBox}>{wallet.accountZpub}</div>
               <button
                 onClick={() => copy("zpub", wallet.accountZpub)}
@@ -372,7 +414,11 @@ export function ColdWallet() {
                 {copied === "zpub" ? t.copied : "copy"}
               </button>
               <div className="mt-4">
-                <span className={fieldLabel}>{t.firstAddrTitle}</span>
+                <span className={fieldLabel}>
+                  {network === "testnet"
+                    ? t.firstAddrTitle.replace("m/84'/0'/0'/0/0", "m/84'/1'/0'/0/0")
+                    : t.firstAddrTitle}
+                </span>
                 <div dir="ltr" className={`${monoBox} text-[13px]`}>{wallet.firstAddress}</div>
                 <p className="mt-1.5 text-xs text-muted-foreground">{t.firstAddrNote}</p>
               </div>

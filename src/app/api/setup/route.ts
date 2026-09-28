@@ -18,6 +18,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authenticateApiKey, generateApiKey } from "@/lib/server/api-auth";
 import { deriveInvoiceAddress, deriveWatchOnlyAddress } from "@/lib/server/derive";
+import { hrpFor } from "@/lib/network";
+import { env } from "@/lib/env";
 import {
   consumeSetupToken,
   getSettings,
@@ -106,16 +108,17 @@ export async function POST(req: Request) {
   const b = body.data;
 
   // ── wallet validation = derive a REAL address as proof the node sees it ──
+  const hrp = hrpFor(env.NETWORK);
   let proofAddress: string;
   let paymentCode: string | null = null;
   let xpub: string | null = null;
   try {
     if (b.wallet.kind === "paymentcode") {
-      const d = deriveInvoiceAddress(b.wallet.value);
+      const d = deriveInvoiceAddress(b.wallet.value, hrp);
       proofAddress = d.address;
       paymentCode = b.wallet.value;
     } else {
-      const d = deriveWatchOnlyAddress(b.wallet.value, 0);
+      const d = deriveWatchOnlyAddress(b.wallet.value, 0, hrp);
       proofAddress = d.address;
       xpub = b.wallet.value;
     }
@@ -127,7 +130,9 @@ export async function POST(req: Request) {
         hint:
           b.wallet.kind === "paymentcode"
             ? "a BIP47 payment code starts with PM8T and is 67 characters"
-            : "a BIP84 zpub starts with zpub (or xpub) — check for typos and that it is the account-level key",
+            : hrp === "tb"
+              ? "on this testnet node paste a vpub (BIP84 testnet, from a testnet wallet) — zpub/xpub are mainnet keys"
+              : "a BIP84 zpub starts with zpub (or xpub) — check for typos and that it is the account-level key",
       },
       { status: 422 }
     );

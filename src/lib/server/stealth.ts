@@ -26,14 +26,18 @@ import { parsePaymentCode, pubkeyToBech32Address } from "./keys";
 const SECP_N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
 
 export interface StealthResult {
-  /** P2WPKH one-time address (bc1q…) */
+  /** P2WPKH one-time address (bc1q… mainnet / tb1q… testnet) */
   address: string;
   /** 33-byte compressed ephemeral public key (hex) — stored on the invoice */
   ephemeralPub: string;
 }
 
 /** SERVER-SIDE (public data only). Generates a fresh one-time address. */
-export function deriveStealthAddress(scanPub: Uint8Array, spendPub: Uint8Array): StealthResult {
+export function deriveStealthAddress(
+  scanPub: Uint8Array,
+  spendPub: Uint8Array,
+  hrp = "bc"
+): StealthResult {
   const ephSecret = secp256k1.utils.randomSecretKey();
   const ephPub = secp256k1.getPublicKey(ephSecret, true);
   const s = sha256(secp256k1.getSharedSecret(ephSecret, scanPub));
@@ -41,15 +45,15 @@ export function deriveStealthAddress(scanPub: Uint8Array, spendPub: Uint8Array):
     .add(secp256k1.Point.fromBytes(secp256k1.getPublicKey(s, true))) // s·G
     .toBytes(true);
   return {
-    address: pubkeyToBech32Address(stealthPub),
+    address: pubkeyToBech32Address(stealthPub, hrp),
     ephemeralPub: bytesToHex(ephPub),
   };
 }
 
 /** Derive a one-time address from a serialized payment code. */
-export function stealthAddressFromPaymentCode(paymentCode: string): StealthResult {
+export function stealthAddressFromPaymentCode(paymentCode: string, hrp = "bc"): StealthResult {
   const { scanPub, spendPub } = parsePaymentCode(paymentCode);
-  return deriveStealthAddress(scanPub, spendPub);
+  return deriveStealthAddress(scanPub, spendPub, hrp);
 }
 
 /** CLIENT-SIDE (needs secrets). Recompute the spendable key for an invoice. */

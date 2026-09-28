@@ -10,6 +10,8 @@
 
 import { generateApiKey } from "../src/lib/server/api-auth";
 import { deriveWatchOnlyAddress, deriveInvoiceAddress } from "../src/lib/server/derive";
+import { env } from "../src/lib/env";
+import { hrpFor } from "../src/lib/network";
 
 function hex(n: number): string {
   const b = new Uint8Array(n);
@@ -42,13 +44,14 @@ async function main() {
   const xpub = process.env.LP_ZPUB ?? process.env.LP_XPUB;
 
   header("wallet check");
+  const hrp = hrpFor(env.NETWORK);
   try {
     if (payCode) {
-      const d = deriveInvoiceAddress(payCode);
+      const d = deriveInvoiceAddress(payCode, hrp);
       console.log(`payment code OK → first stealth address: ${d.address}`);
     } else if (xpub) {
-      const d = deriveWatchOnlyAddress(xpub, 0);
-      console.log(`zpub/xpub OK → first watch-only address (m/0/0): ${d.address}`);
+      const d = deriveWatchOnlyAddress(xpub, 0, hrp);
+      console.log(`zpub/vpub OK → first watch-only address (m/0/0): ${d.address}`);
     } else {
       console.log("⚠ no wallet configured yet — set LP_PAYMENT_CODE or LP_ZPUB");
       console.log("  the rail stays DARK (invoices refused) until then. by design.");

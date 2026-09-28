@@ -81,18 +81,20 @@ export function isWithinUnderpaymentTolerance(
 }
 
 /**
- * Strict mainnet BTC address validation WITH checksum verification.
- *  - bc1… (SegWit v0 P2WPKH/P2WSH bech32, v1+ P2TR bech32m) per BIP-173/350
- *  - 1…/3… (P2PKH/P2SH base58check, double-SHA256 checksum)
+ * Strict BTC address validation WITH checksum verification, per network.
+ *  - mainnet: bc1… (SegWit v0 P2WPKH/P2WSH bech32, v1+ P2TR bech32m) per
+ *    BIP-173/350 · 1…/3… (P2PKH/P2SH base58check)
+ *  - testnet: tb1… · m…/n…/2… (same encodings, testnet versions)
  * A typo'd refund address now fails instead of burning the merchant's funds.
  */
-export function isValidBtcAddress(address: string): boolean {
+export function isValidBtcAddress(address: string, network: "mainnet" | "testnet" = "mainnet"): boolean {
   const addr = (address || "").trim();
   if (!addr) return false;
+  const bech32Re = network === "testnet" ? /^tb1/i : /^bc1/i;
 
   // --- SegWit: bech32 / bech32m ---
   const mixedCase = addr !== addr.toLowerCase() && addr !== addr.toUpperCase();
-  if (!mixedCase && /^bc1/i.test(addr)) {
+  if (!mixedCase && bech32Re.test(addr)) {
     try {
       const s = addr.toLowerCase();
       let ver = -1;
@@ -120,7 +122,18 @@ export function isValidBtcAddress(address: string): boolean {
     }
   }
 
-  // --- Legacy: base58check (P2PKH 1… / P2SH 3…) ---
+  // --- Legacy: base58check (P2PKH/P2SH) ---
+  if (network === "testnet") {
+    if (/^[mn2][1-9A-HJ-NP-Za-km-z]{25,34}$/.test(addr)) {
+      try {
+        const bytes = b58c.decode(addr);
+        return bytes.length === 21; // version(1) + hash160(20) — checksum verified & stripped by base58check
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
   if (/^[13][1-9A-HJ-NP-Za-km-z]{25,34}$/.test(addr)) {
     try {
       const bytes = b58c.decode(addr);

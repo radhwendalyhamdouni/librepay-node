@@ -11,19 +11,22 @@ import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { bip21Uri } from "@/lib/bitcoin";
 import { getMerchant } from "@/lib/config";
 import { env } from "@/lib/env";
+import { explorerPathFor } from "@/lib/network";
 
 /**
  * Block-explorer base derived from the operator's OWN Esplora setting —
  * running a self-hosted mempool instance means even the "view on explorer"
  * links stay inside infrastructure the operator controls. Non-mempool or
- * malformed ESPLORA_API values fall back to mempool.space.
+ * malformed ESPLORA_API values fall back to mempool.space. On a testnet
+ * node the /testnet4 path is appended so tx links resolve on the right chain.
  */
 function explorerTxBase(): string {
+  const netPath = explorerPathFor(env.NETWORK);
   try {
     const u = new URL(env.ESPLORA_API);
-    return `${u.protocol}//${u.host}`;
+    return `${u.protocol}//${u.host}${netPath}`;
   } catch {
-    return "https://mempool.space";
+    return `https://mempool.space${netPath}`;
   }
 }
 

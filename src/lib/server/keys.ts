@@ -23,6 +23,7 @@ import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { createBase58check, bech32 as bech32Base } from "@scure/base";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { ripemd160 } from "@noble/hashes/legacy.js";
+import { coinTypeFor, type Network } from "../network";
 
 const b58c = createBase58check(sha256);
 
@@ -30,10 +31,21 @@ const b58c = createBase58check(sha256);
 export const SCAN_PATH = "m/47'/0'/0'/0"; // ECDH scan key (leaf)
 export const SPEND_PATH = "m/47'/0'/0'/1"; // stealth spend key (leaf)
 export const ACCOUNT_PATH = "m/84'/0'/0'"; // BIP84 account for watch-only xpub
+/**
+ * BIP84 account path per network. The LibrePay v1 payment-code scheme keeps
+ * its SCAN/SPEND paths identical on both networks (it is a LibrePay-specific
+ * layout, not interoperable with third-party BIP47 wallets anyway).
+ */
+export function bip84AccountPath(network: Network = "mainnet"): string {
+  return `m/84'/${coinTypeFor(network)}'/0'`;
+}
 
 const ZPUB_VERSION = new Uint8Array([0x04, 0xb2, 0x47, 0x46]);
 const XPUB_VERSION = new Uint8Array([0x04, 0x88, 0xb2, 0x1e]);
+const VPUB_VERSION = new Uint8Array([0x04, 0x5f, 0x1c, 0xf6]);
+const TPUB_VERSION = new Uint8Array([0x04, 0x35, 0x87, 0xcf]);
 const WIF_VERSION = 0x80;
+const WIF_VERSION_TESTNET = 0xef;
 
 export interface WalletKeys {
   scanPriv: Uint8Array;
@@ -67,11 +79,11 @@ export function seedFromMnemonic(mnemonic: string, passphrase = ""): Uint8Array 
   return mnemonicToSeedSync(normalizeMnemonic(mnemonic), passphrase);
 }
 
-export function deriveWalletKeys(seed: Uint8Array): WalletKeys {
+export function deriveWalletKeys(seed: Uint8Array, network: Network = "mainnet"): WalletKeys {
   const root = HDKey.fromMasterSeed(seed);
   const scan = root.derive(SCAN_PATH);
   const spend = root.derive(SPEND_PATH);
-  const acct = root.derive(ACCOUNT_PATH);
+  const acct = root.derive(bip84AccountPath(network));
   if (!scan.privateKey || !scan.publicKey || !spend.privateKey || !spend.publicKey || !acct.publicKey) {
     throw new Error("Derivation failed");
   }
@@ -81,7 +93,7 @@ export function deriveWalletKeys(seed: Uint8Array): WalletKeys {
     scanPub: secpCompress(scan.publicKey),
     spendPriv: spend.privateKey,
     spendPub: secpCompress(spend.publicKey),
-    accountZpub: toZpub(acct.publicExtendedKey),
+    accountZpub: network === "testnet" ? toVpub(acct.publicExtendedKey) : toZpub(acct.publicExtendedKey),
     paymentCode: buildPaymentCode(secpCompress(spend.publicKey), secpCompress(scan.publicKey)),
   };
 }
@@ -124,31 +136,46 @@ export function parsePaymentCode(code: string): ParsedPaymentCode {
 
 /** Convert xpub string to zpub (BIP84) by swapping the version prefix. */
 export function toZpub(xpub: string): string {
+  return relabelExtendedPub(xpub, ZPUB_VERSION);
+}
+
+/** Convert xpub string to vpub (BIP84 testnet) by swapping the version prefix. */
+export function toVpub(xpub: string): string {
+  return relabelExtendedPub(xpub, VPUB_VERSION);
+}
+
+function relabelExtendedPub(xpub: string, version: Uint8Array): string {
   const raw = b58c.decode(xpub.trim());
   if (raw.length !== 78) throw new Error("Invalid extended key");
   const out = new Uint8Array(78);
-  out.set(ZPUB_VERSION, 0);
+  out.set(version, 0);
   out.set(raw.slice(4), 4);
   return b58c.encode(out);
 }
 
-/** Accept xpub or zpub; returns normalized zpub + its 33-byte account pubkey. */
-export function normalizeXpub(input: string): { zpub: string; accountPub: Uint8Array } {
+/** Accept mainnet (xpub/zpub) or testnet (tpub/vpub) extended pubkeys. */
+export function normalizeXpub(
+  input: string
+): { zpub: string; accountPub: Uint8Array; network: Network } {
   const raw = b58c.decode(input.trim());
   if (raw.length !== 78) throw new Error("Invalid extended key length");
   const version = raw.slice(0, 4);
-  const isX = version.every((b, i) => b === XPUB_VERSION[i]);
-  const isZ = version.every((b, i) => b === ZPUB_VERSION[i]);
-  if (!isX && !isZ) throw new Error("Only mainnet xpub/zpub are supported");
-  const zpub = isZ ? b58c.encode(raw) : toZpub(input.trim());
-  // pubkey lives at index 45..78 (33 bytes compressed)
-  return { zpub, accountPub: raw.slice(45, 78) };
+  const eq = (v: Uint8Array) => version.every((b, i) => b === v[i]);
+  if (eq(XPUB_VERSION) || eq(ZPUB_VERSION)) {
+    const zpub = eq(ZPUB_VERSION) ? b58c.encode(raw) : toZpub(input.trim());
+    return { zpub, accountPub: raw.slice(45, 78), network: "mainnet" };
+  }
+  if (eq(TPUB_VERSION) || eq(VPUB_VERSION)) {
+    const zpub = eq(VPUB_VERSION) ? b58c.encode(raw) : toVpub(input.trim());
+    return { zpub, accountPub: raw.slice(45, 78), network: "testnet" };
+  }
+  throw new Error("Only xpub/zpub (mainnet) or tpub/vpub (testnet) are supported");
 }
 
 /** WIF export (compressed) for a 32-byte private key. */
-export function toWIF(priv: Uint8Array): string {
+export function toWIF(priv: Uint8Array, network: Network = "mainnet"): string {
   const buf = new Uint8Array(34);
-  buf[0] = WIF_VERSION;
+  buf[0] = network === "testnet" ? WIF_VERSION_TESTNET : WIF_VERSION;
   buf.set(priv, 1);
   buf[33] = 0x01; // compressed flag
   return b58c.encode(buf);

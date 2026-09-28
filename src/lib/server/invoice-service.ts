@@ -5,6 +5,7 @@
 import { db } from "@/lib/db";
 import { createInvoiceSchema, type CreateInvoiceInput } from "@/lib/validation";
 import { deriveInvoiceAddress, deriveWatchOnlyAddress } from "./derive";
+import { hrpFor } from "../network";
 import { getFiatRates } from "./esplora";
 import { FALLBACK_RATES } from "./fallback-rates";
 import { fiatToSats, SUPPORTED_CURRENCIES } from "@/lib/bitcoin";
@@ -89,12 +90,13 @@ export async function createInvoiceForMerchant(
     if (amountSats < 1) throw new InvoiceError("AMOUNT_TOO_SMALL");
   }
 
-  // ---- one-time address derivation ----
+  // ---- one-time address derivation (network-aware HRP: bc1… / tb1…) ----
+  const hrp = hrpFor(env.NETWORK);
   let address = "";
   let ephemeralPub: string | null = null;
   let derivationIndex: number | null = null;
   if (merchant.walletMode === "selfcustody" && merchant.paymentCode) {
-    const d = deriveInvoiceAddress(merchant.paymentCode);
+    const d = deriveInvoiceAddress(merchant.paymentCode, hrp);
     address = d.address;
     ephemeralPub = d.ephemeralPub ?? null;
   } else if (merchant.accountXpub) {
@@ -103,7 +105,7 @@ export async function createInvoiceForMerchant(
     // probe forward until a free index is found instead of erroring.
     let idx = await db.invoice.count({ where: { merchantId: merchant.id } });
     for (let attempt = 0; attempt < 10; attempt++) {
-      const d = deriveWatchOnlyAddress(merchant.accountXpub, idx);
+      const d = deriveWatchOnlyAddress(merchant.accountXpub, idx, hrp);
       const clash = await db.invoice.findFirst({
         where: { stealthAddress: d.address },
         select: { id: true },
