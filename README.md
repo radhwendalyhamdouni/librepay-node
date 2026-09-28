@@ -1,4 +1,4 @@
-# ₿ LibrePay Node
+# LibrePay Node ₿ 
 
 <div align="center">
   <img src="public/brand/logo-lockup-dark.png" alt="LibrePay — Your payments. Your server. Your keys." width="420" />
