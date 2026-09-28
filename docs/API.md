@@ -21,6 +21,12 @@ missing keys get `401 {"error":"unauthorized"}`.
 POST /api/v1/invoices
 ```
 
+**Idempotency** (Stripe-style): send `Idempotency-Key: <unique-token>`
+(header, ≤128 chars). The same key always returns the SAME invoice — network
+retries can never mint a second one. A replay adds the response header
+`Idempotency-Replayed: true`. Note: a key that already produced an invoice
+should never be reused for a different order.
+
 Request (Zod-validated):
 
 | field | type | rules |
@@ -72,6 +78,19 @@ underpaid (received < 99% of amountSats after confirmations)
 
 **Release goods on `confirmed`** (default 2 confs, instant for Lightning).
 `settled` (6+ confs) is the deep-finality signal.
+
+Reliability guarantees behind these transitions:
+
+- **Reorg guard** — on-chain payments flip to `confirmed` only after the
+  ≥N-confirmation sighting REPEATS on the next cron tick (~30s later). One
+  Esplora hiccup or a shallow reorg cannot produce a false `confirmed`.
+- **Transactional outbox** — webhook rows are written in the same SQLite
+  transaction as the status change: a crash can never separate "mark paid"
+  from "notify the shop". Deliveries are at-least-once; receivers dedupe on
+  `X-LibrePay-Delivery-Id`.
+- **Webhook retries** — 1m, 5m, 15m, 1h, 6h, 24h (~8 attempts), then `dead`.
+  The console → Webhooks card has a **Requeue dead deliveries** action
+  (`POST /api/system/webhooks {"action":"redrive"}`) that requeues them all.
 
 ## Webhooks
 

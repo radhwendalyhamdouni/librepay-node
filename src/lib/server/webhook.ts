@@ -8,10 +8,14 @@
 
 import { createHmac, timingSafeEqual, createHash } from "node:crypto";
 import { db } from "@/lib/db";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { assertOutboundUrl } from "./ssrf-guard";
 import { getWebhookEndpoints } from "@/lib/config";
 import { env } from "@/lib/env";
 import { logSecurityEvent, SecurityEventType } from "@/lib/server/audit";
+
+/** Any Prisma client handle — the outer db or an interactive $transaction. */
+export type DbClient = PrismaClient | Prisma.TransactionClient;
 
 interface WebhookPayloadLike { timestamp?: number }
 
@@ -42,8 +46,17 @@ export function bodyHash(body: string): string {
 const RETRY_SCHEDULE_MIN = [1, 5, 15, 60, 360, 1440]; // ~8 attempts
 const MAX_ATTEMPTS = RETRY_SCHEDULE_MIN.length + 1;
 
-/** Queue deliveries for every configured endpoint (env: LP_WEBHOOK_URLS/SECRETS). */
+/**
+ * Queue deliveries for every configured endpoint (env: LP_WEBHOOK_URLS/SECRETS).
+ *
+ * OUTBOX: pass a $transaction client and this runs INSIDE the same SQLite
+ * transaction as the invoice status change — either both commit or neither
+ * does. A crash between "mark paid" and "notify shop" is therefore
+ * impossible by construction; the next cron tick simply retries the whole
+ * transition. (At-least-once delivery; receivers dedupe.)
+ */
 export async function enqueueWebhooks(
+  dbc: DbClient,
   merchantId: string,
   event: string,
   invoiceId: string,
@@ -62,7 +75,7 @@ export async function enqueueWebhooks(
       data,
       timestamp: Date.now(),
     };
-    await db.webhookDelivery.create({
+    await dbc.webhookDelivery.create({
       data: {
         url: ep.url,
         secret: ep.secret,
@@ -76,6 +89,15 @@ export async function enqueueWebhooks(
     queued++;
   }
   return queued;
+}
+
+/** Operator rescue: requeue every dead delivery (console → Webhooks). */
+export async function redriveDeadDeliveries(): Promise<number> {
+  const res = await db.webhookDelivery.updateMany({
+    where: { status: "dead" },
+    data: { status: "pending", attempts: 0, lastError: null, nextRetryAt: new Date() },
+  });
+  return res.count;
 }
 
 /** Attempt pending deliveries (cron). Returns processed count. */

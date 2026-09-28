@@ -31,8 +31,24 @@ export class InvoiceError extends Error {
 export async function createInvoiceForMerchant(
   merchant: MerchantConfig,
   rawInput: unknown,
-  req?: Request
-): Promise<{ id: string }> {
+  req?: Request,
+  opts?: { idempotencyKey?: string }
+): Promise<{ id: string; replayed: boolean }> {
+  // ── idempotent replay (Idempotency-Key header) ──
+  // Same key → the SAME invoice comes back, no double creation, no double
+  // address churn. Backed by a UNIQUE (merchantId, idempotencyKey) index, so
+  // even two truly concurrent requests cannot both win: the loser hits the
+  // constraint and is served the winner's invoice.
+  const idemKey = opts?.idempotencyKey;
+  if (idemKey) {
+    const existing = await db.invoice.findFirst({
+      where: { merchantId: merchant.id, idempotencyKey: idemKey },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    if (existing) return { id: existing.id, replayed: true };
+  }
+
   const parsed = createInvoiceSchema.safeParse(rawInput);
   if (!parsed.success) {
     throw new InvoiceError(`INVALID_INPUT: ${parsed.error.issues.map((i) => i.message).join("; ")}`);
@@ -109,27 +125,45 @@ export async function createInvoiceForMerchant(
   const expiresAt = new Date(Date.now() + (input.expiresInMinutes ?? merchant.invoiceExpiryMinutes) * 60_000);
   const buyerLang = input.buyerLang ?? (req ? detectLang(req.headers.get("accept-language")) : "en");
 
-  const invoice = await db.invoice.create({
-    data: {
-      merchantId: merchant.id,
-      amountSats: BigInt(amountSats),
-      fiatCurrency,
-      fiatAmountCents,
-      satsPerUnit,
-      derivationMode: derivationIndex === null ? "stealth" : "watchonly",
-      stealthAddress: address,
-      ephemeralPub,
-      paymentCodeSnapshot: merchant.paymentCode,
-      derivationIndex,
-      orderId: input.orderId,
-      description: input.description,
-      metadata: input.metadata ? JSON.stringify(input.metadata) : null,
-      buyerLang,
-      status: "waiting",
-      confirmationsRequired: Math.max(merchant.confirmationsRequired, 1),
-      expiresAt,
-    },
-  });
+  let invoice;
+  try {
+    invoice = await db.invoice.create({
+      data: {
+        merchantId: merchant.id,
+        amountSats: BigInt(amountSats),
+        fiatCurrency,
+        fiatAmountCents,
+        satsPerUnit,
+        derivationMode: derivationIndex === null ? "stealth" : "watchonly",
+        stealthAddress: address,
+        ephemeralPub,
+        paymentCodeSnapshot: merchant.paymentCode,
+        derivationIndex,
+        orderId: input.orderId,
+        description: input.description,
+        metadata: input.metadata ? JSON.stringify(input.metadata) : null,
+        buyerLang,
+        idempotencyKey: idemKey ?? null,
+        status: "waiting",
+        confirmationsRequired: Math.max(merchant.confirmationsRequired, 1),
+        expiresAt,
+      },
+    });
+  } catch (e) {
+    // lost a concurrent same-key race → serve the winner's invoice
+    if (
+      idemKey &&
+      typeof e === "object" && e !== null && "code" in e && (e as { code?: string }).code === "P2002"
+    ) {
+      const winner = await db.invoice.findFirst({
+        where: { merchantId: merchant.id, idempotencyKey: idemKey },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      if (winner) return { id: winner.id, replayed: true };
+    }
+    throw e;
+  }
 
   // ---- Lightning rail (optional, merchant's own phoenixd) ----
   // The on-chain stealth address is ALWAYS there. If a phoenixd node is
@@ -168,7 +202,7 @@ export async function createInvoiceForMerchant(
     }
   }
 
-  return { id: invoice.id };
+  return { id: invoice.id, replayed: false };
 }
 
 export function checkoutUrlFor(req: Request, invoiceId: string): string {

@@ -113,6 +113,10 @@ const T = {
     hookAdd: "https://your-store.com/wc-api/librepay_webhook",
     hookSave: "Save destinations",
     hookEmpty: "No destinations yet — add your store's webhook URL below.",
+    hookRedrive: "Requeue dead deliveries",
+    hookRedriveDone: "requeued — the retry schedule starts now",
+    hookRedriveNone: "nothing to requeue — no dead deliveries",
+    hookRedriveFail: "redrive failed — check you are still signed in",
     wooTitle: "WooCommerce (WordPress)",
     wooStep1: "Download the plugin, then in WordPress: Plugins → Add New → Upload Plugin.",
     wooStep2: "WooCommerce → Settings → Payments → “Bitcoin via LibrePay” → Enable.",
@@ -306,6 +310,10 @@ const T = {
     hookAdd: "https://your-store.com/wc-api/librepay_webhook",
     hookSave: "حفظ الوجهات",
     hookEmpty: "لا وجهات بعد — أضف رابط ويبهوك متجرك أدناه.",
+    hookRedrive: "إعادة إرسال الفواتير الميتة",
+    hookRedriveDone: "أُعيد طابورها — جدول المحاولات يبدأ الآن",
+    hookRedriveNone: "لا شيء لإعادة الإرسال — لا فواتير ميتة",
+    hookRedriveFail: "فشل إعادة الإرسال — تأكد أن جلستك ما تزال حية",
     wooTitle: "ووكومرس (ووردبريس)",
     wooStep1: "حمّل الإضافة ثم في ووردبريس: إضافات → أضف جديد → ارفع الإضافة.",
     wooStep2: "ووكومرس → الإعدادات → الدفعات ← «Bitcoin via LibrePay» ← تمكين.",
@@ -518,6 +526,7 @@ export default function SetupWizard() {
   const [copied, setCopied] = useState<string | null>(null);
   const [hookList, setHookList] = useState<string[]>([]);
   const [newHook, setNewHook] = useState("");
+  const [redriveMsg, setRedriveMsg] = useState("");
   // privacy / lightning / security state
   const [privacyMode, setPrivacyMode] = useState<"standard" | "balanced" | "maximum" | null>(null);
   const [lnUrl, setLnUrl] = useState("");
@@ -984,6 +993,24 @@ export default function SetupWizard() {
     });
     if (!guard(r, saveHooks)) return;
     await loadManage();
+    setBusy(false);
+  }
+
+  async function redrive() {
+    setBusy(true);
+    setRedriveMsg("");
+    const r = await fetch("/api/system/webhooks", {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "redrive" }),
+    });
+    if (!guard(r, redrive)) return;
+    if (r.ok) {
+      const d = (await r.json()) as { redriven: number };
+      setRedriveMsg(d.redriven > 0 ? `${d.redriven} ${t.hookRedriveDone}` : t.hookRedriveNone);
+    } else {
+      setRedriveMsg(t.hookRedriveFail);
+    }
     setBusy(false);
   }
 
@@ -1504,7 +1531,15 @@ export default function SetupWizard() {
                     onClick={() => { setHookList([...hookList, newHook.trim()]); setNewHook(""); }}
                   >+</button>
                 </div>
-                <button className="mb-5 rounded-md border px-3 py-1.5 text-xs hover:bg-muted" disabled={busy} onClick={saveHooks}>{t.hookSave}</button>
+                <div className="flex items-center gap-2 mb-5">
+                  <button className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted" disabled={busy} onClick={saveHooks}>{t.hookSave}</button>
+                  <button
+                    className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
+                    disabled={busy}
+                    onClick={redrive}
+                  >{t.hookRedrive}</button>
+                  {redriveMsg && <span className="text-xs text-muted-foreground">{redriveMsg}</span>}
+                </div>
 
                 <div className="rounded-lg border p-4 mb-4">
                   <h3 className="font-semibold text-sm mb-2">🛒 {t.wooTitle}</h3>

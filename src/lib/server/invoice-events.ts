@@ -42,21 +42,19 @@ function publicInvoiceData(inv: Invoice) {
   };
 }
 
-async function fireTransition(inv: Invoice, event: string) {
-  try {
-    await enqueueWebhooks(inv.merchantId, event, inv.id, { invoice: publicInvoiceData(inv) });
-  } catch (err) {
-    console.error("[webhook-enqueue]", event, err);
-  }
-}
-
-/** Persist a status transition (idempotent — never moves backwards).
- *  The status update is CONDITIONAL on the status we read (atomic compare-and-set):
- *  two concurrent cron ticks can no longer double-fire webhooks for one change.
- *  Emits: invoice.detected / confirmed / settled / expired / underpaid. */
+/**
+ * Persist a status transition (idempotent — never moves backwards).
+ *
+ * ATOMIC COMPARE-AND-SET + TRANSACTIONAL OUTBOX: the status write and the
+ * webhook queueing share ONE SQLite transaction. If enqueueing fails, the
+ * status change rolls back too and the next cron tick retries the whole
+ * transition — a shop can never miss a payment notification because of a
+ * crash in between. Two concurrent ticks still cannot double-fire.
+ * Emits: invoice.detected / confirmed / settled / expired / underpaid.
+ */
 export async function transitionInvoice(
   invoiceId: string,
-  patch: { status?: string; txid?: string | null; receivedSats?: bigint; confirmations?: number; paidAt?: Date; settledAt?: Date; payerAddress?: string | null; paidVia?: "onchain" | "lightning"; lightningPaidAt?: Date }
+  patch: { status?: string; txid?: string | null; receivedSats?: bigint; confirmations?: number; paidAt?: Date; settledAt?: Date; payerAddress?: string | null; paidVia?: "onchain" | "lightning"; lightningPaidAt?: Date; confirmedStreak?: number }
 ): Promise<Invoice | null> {
   const inv = await db.invoice.findUnique({ where: { id: invoiceId } });
   if (!inv) return null;
@@ -100,17 +98,24 @@ export async function transitionInvoice(
 
   if (Object.keys(data).length === 0) return inv;
 
-  // atomic compare-and-set: only write if status is still what we read
-  const res = await db.invoice.updateMany({
-    where: { id: invoiceId, status: inv.status },
-    data,
+  // one transaction = status change + its webhook rows (see docblock above)
+  const updated = await db.$transaction(async (tx) => {
+    // atomic compare-and-set: only write if status is still what we read
+    const res = await tx.invoice.updateMany({
+      where: { id: invoiceId, status: inv.status },
+      data,
+    });
+    if (res.count === 0) return null; // a concurrent writer already transitioned
+    const row = (await tx.invoice.findUnique({ where: { id: invoiceId } })) as Invoice;
+    for (const ev of events) {
+      await enqueueWebhooks(tx, inv.merchantId, ev, inv.id, { invoice: publicInvoiceData(row) });
+    }
+    return row;
   });
-  if (res.count === 0) {
-    // a concurrent writer already transitioned — return current row, fire nothing
+  if (updated === null) {
+    // concurrent writer won — return current row, fire nothing
     return db.invoice.findUnique({ where: { id: invoiceId } });
   }
-  const updated = (await db.invoice.findUnique({ where: { id: invoiceId } })) as Invoice;
-  for (const ev of events) await fireTransition(updated, ev);
   if (events.includes("invoice.settled")) {
     // in-app bell for the merchant — one hook covers ALL rails (on-chain,
     // lightning, manual, simulate) because every settlement funnels through
@@ -190,14 +195,46 @@ export async function checkOpenInvoices(): Promise<{
         patch.status = "settled";
         patch.settledAt = new Date();
       } else if (conf >= inv.confirmationsRequired) {
-        patch.status = "confirmed";
-        patch.paidAt = new Date();
+        // REORG GUARD: a confirmed-level sighting must REPEAT on the next
+        // tick (~30s later) before the invoice flips. One Esplora hiccup or
+        // a shallow reorg can no longer fire a false invoice.confirmed.
+        // (Lightning skips this — instant settlement has no blocks to reorg.)
+        if (inv.status === "confirmed" || inv.status === "settled") {
+          // already past the gate — keep refreshing metadata only
+        } else {
+          const streak = (inv.confirmedStreak ?? 0) + 1;
+          if (streak >= 2) {
+            patch.status = "confirmed";
+            patch.paidAt = new Date();
+            patch.confirmedStreak = streak;
+          } else {
+            patch.status = "detected";
+            patch.confirmedStreak = streak;
+          }
+        }
       } else {
         patch.status = "detected";
       }
+      // confirmations dropped below the bar (reorg/fee chase) — reset the gate
+      if (conf < inv.confirmationsRequired) patch.confirmedStreak = 0;
 
       const before = inv.status;
-      const after = await transitionInvoice(inv.id, patch);
+      let after: Invoice | null;
+      if (patch.status === "settled" && (before === "waiting" || before === "detected")) {
+        // long tick gap: confirmations jumped straight past the confirmed
+        // threshold. Still emit BOTH events in contract order — shops release
+        // goods on invoice.confirmed and must not miss it.
+        await transitionInvoice(inv.id, {
+          ...patch,
+          status: "confirmed",
+          settledAt: undefined,
+          paidAt: patch.paidAt ?? new Date(),
+        });
+        summary.confirmed++;
+        after = await transitionInvoice(inv.id, { status: "settled", settledAt: new Date() });
+      } else {
+        after = await transitionInvoice(inv.id, patch);
+      }
       if (after) {
         if (before === "waiting" && after.status === "detected") summary.detected++;
         if (after.status === "confirmed" && before !== "confirmed" && before !== "settled") summary.confirmed++;
@@ -218,18 +255,28 @@ export async function checkOpenInvoices(): Promise<{
     take: 500,
   });
   if (staleRows.length > 0) {
-    const stale = await db.invoice.updateMany({
-      where: { id: { in: staleRows.map((r) => r.id) }, status: { in: ["waiting", "detected"] } },
-      data: { status: "expired", expiredNotified: true },
-    });
-    summary.expired += stale.count;
+    // outbox: expiry + its webhook rows in one transaction per invoice
     for (const inv of staleRows) {
-      // payload must reflect the post-transition state
-      await fireTransition({ ...inv, status: "expired" }, "invoice.expired");
+      const ok = await db
+        .$transaction(async (tx) => {
+          const res = await tx.invoice.updateMany({
+            where: { id: inv.id, status: { in: ["waiting", "detected"] }, expiredNotified: false },
+            data: { status: "expired", expiredNotified: true },
+          });
+          if (res.count === 0) return false;
+          await enqueueWebhooks(tx, inv.merchantId, "invoice.expired", inv.id, {
+            invoice: publicInvoiceData({ ...inv, status: "expired", expiredNotified: true }),
+          });
+          return true;
+        })
+        .catch((err) => {
+          console.error("[expire-outbox]", inv.id, err);
+          return false;
+        });
+      if (ok) summary.expired++;
     }
   }
 
-  // fire webhook for expired (only those transitioning this pass)
   return summary;
 }
 

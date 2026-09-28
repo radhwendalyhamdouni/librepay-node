@@ -23,15 +23,26 @@ export async function POST(req: Request) {
   try {
     const merchant = getMerchant();
 
+    // Stripe-style idempotency: send `Idempotency-Key: <your-unique-token>`
+    // and network retries can never create a second invoice for one order.
+    const rawKey = (req.headers.get("idempotency-key") ?? "").trim();
+    if (rawKey.length > 128) {
+      return NextResponse.json({ error: "INVALID_INPUT", detail: "Idempotency-Key too long (max 128)" }, { status: 400 });
+    }
+    const idempotencyKey = rawKey || undefined;
+
     const body = await req.json().catch(() => ({}));
-    const { id } = await createInvoiceForMerchant(merchant, body, req);
+    const { id, replayed } = await createInvoiceForMerchant(merchant, body, req, { idempotencyKey });
     const invoice = await db.invoice.findUnique({ where: { id } });
     return NextResponse.json(
       {
         invoice: invoice ? serializeInvoice(invoice) : null,
         checkoutUrl: checkoutUrlFor(req, id),
       },
-      { status: 201 }
+      {
+        status: 201,
+        headers: replayed ? { "Idempotency-Replayed": "true" } : undefined,
+      }
     );
   } catch (e) {
     if (e instanceof InvoiceError) return NextResponse.json({ error: e.code }, { status: e.httpStatus });

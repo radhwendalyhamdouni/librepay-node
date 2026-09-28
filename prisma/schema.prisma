@@ -35,6 +35,10 @@ model Invoice {
   description String?
   metadata    String? // stringified JSON (portable)
   buyerLang   String  @default("en")
+  // API idempotency: same Idempotency-Key + merchant → the SAME invoice is
+  // returned (client-safe retries on flaky networks). Unique index below —
+  // SQLite treats NULLs as distinct so non-keyed invoices never conflict.
+  idempotencyKey String?
 
   // Lifecycle: waiting → detected → confirmed → settled | expired | underpaid
   status                String    @default("waiting")
@@ -46,6 +50,11 @@ model Invoice {
   settledAt             DateTime?
   expiredNotified       Boolean   @default(false)
   underpaidNotified     Boolean   @default(false)
+  // Reorg guard: number of consecutive cron ticks that saw the payment at
+  // >= confirmationsRequired. `confirmed` fires only on the 2nd sighting —
+  // one tick later (~30s) — so an Esplora hiccup or a shallow reorg can
+  // never flip an invoice to confirmed prematurely.
+  confirmedStreak       Int       @default(0)
 
   // Lightning (optional second rail — same invoice, instant settlement)
   lightningPaymentRequest String? // bolt11 invoice string (lnbc…)
@@ -67,6 +76,10 @@ model Invoice {
   @@index([merchantId, status])
   @@index([merchantId, createdAt])
   @@index([status, expiresAt])
+  // UNIQUE dedupe: two concurrent creates with the same key cannot both win —
+  // the loser hits the constraint and returns the winner's invoice.
+  // SQLite allows multiple NULLs, so keyless invoices never conflict.
+  @@unique([merchantId, idempotencyKey])
 }
 
 model WebhookDelivery {

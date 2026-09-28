@@ -153,13 +153,19 @@ Payment appears in your wallet; your webhook receives `invoice.confirmed`.
 ## Connect an e-commerce store
 
 - **WooCommerce**: drop [`integrations/woocommerce/`](integrations/woocommerce/)
-  into your plugins folder, set the node URL + API key. Done.
+  (v2.0 — idempotent invoices, invoice reuse, late-payment revival, one-click
+  connection test, orders-list column, HPOS) into your plugins folder, paste
+  the node URL + API key, press **Test connection**. Done.
+- **Shopify**: [`integrations/shopify/`](integrations/shopify/) — a
+  dependency-free self-hosted bridge that automates the manual-payment
+  pattern end-to-end (invoice on checkout, order marked paid on confirm).
 - **Any platform, copy-paste**: ready-made integration snippets in
   [`examples/`](examples/) — PHP, Node, Python, a hardened webhook receiver
   (timing-safe signature check + idempotency), and a backend proxy for the
   [`librepay.js`](public/librepay.js) embed button.
 - **The full contract**: two authenticated endpoints —
-  [docs/API.md](docs/API.md) has every field and every webhook event.
+  [docs/API.md](docs/API.md) has every field, the Idempotency-Key semantics,
+  and every webhook event.
 
 ## Deploy on Tor
 

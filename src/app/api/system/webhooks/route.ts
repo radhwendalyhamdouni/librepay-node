@@ -1,6 +1,7 @@
 /**
  * GET  /api/system/webhooks — list configured webhook destinations (Bearer).
  * PUT  /api/system/webhooks — replace the destination list (Bearer).
+ * POST /api/system/webhooks — { action: "redrive" } requeues dead deliveries.
  *
  * Merchants connect stores (WooCommerce, custom carts) by registering the
  * URL that should receive signed invoice events. This endpoint exists so
@@ -19,6 +20,7 @@ import {
 } from "@/lib/server/console-auth";
 import { getSettings, saveSettings } from "@/lib/server/settings";
 import { assertOutboundUrl } from "@/lib/server/ssrf-guard";
+import { redriveDeadDeliveries } from "@/lib/server/webhook";
 import { env } from "@/lib/env";
 import { logSecurityEvent, SecurityEventType } from "@/lib/server/audit";
 
@@ -75,4 +77,25 @@ export async function PUT(req: Request) {
     detail: `webhook destinations set (${cleaned.length})`,
   });
   return NextResponse.json({ ok: true, urls: cleaned });
+}
+
+export async function POST(req: Request) {
+  if (!(await authenticateConsole(req))) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+  const body = (await req.json().catch(() => ({}))) as { action?: string };
+  if (body.action !== "redrive") {
+    return NextResponse.json({ error: "INVALID_INPUT", detail: "action must be 'redrive'" }, { status: 400 });
+  }
+  // Rescue lane: requeue every dead delivery. Safe by construction —
+  // deliveries keep their ENQUEUED url + secret snapshot and are re-signed
+  // at send time, so redrive cannot redirect a payload to a new destination.
+  const redriven = await redriveDeadDeliveries();
+  logSecurityEvent({
+    type: SecurityEventType.WEBHOOKS_UPDATED,
+    severity: "info",
+    req,
+    detail: `webhook redrive — ${redriven} dead deliveries requeued`,
+  });
+  return NextResponse.json({ ok: true, redriven });
 }

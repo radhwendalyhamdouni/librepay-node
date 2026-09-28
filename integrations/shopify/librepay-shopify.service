@@ -1,0 +1,28 @@
+[Unit]
+Description=LibrePay ⇄ Shopify bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=librepay
+WorkingDirectory=/opt/librepay-shopify
+# secrets: /opt/librepay-shopify/.env (chmod 600) — see README
+EnvironmentFile=/opt/librepay-shopify/.env
+ExecStart=/usr/bin/node /opt/librepay-shopify/bridge.mjs
+Restart=always
+RestartSec=3
+StateDirectory=librepay-shopify
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/librepay-shopify
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target
