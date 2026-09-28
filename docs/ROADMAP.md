@@ -1,12 +1,25 @@
 # Roadmap — how the node becomes the best in class
 
+**Status: P0 (guarantees) complete · latest release [v0.8.1](https://github.com/radhwendalyhamdouni/librepay-node/releases/latest) · CI green on every push**
+
 Position: **self-hosted, zero-account, single-merchant gateway with a
 BTCPay-grade console and a SaaS-grade API** — installable in minutes on any
 VPS with SQLite, no Docker, no full node, no third party. The plan below is
-ordered by what makes it *أكفأ، أضمن، أنجع* (most capable, most reliable,
-most effective) against BTCPay Server and custodial SaaS gateways.
+ordered by what makes it *most capable, most reliable, most effective*
+against BTCPay Server and custodial SaaS gateways.
 
-## P0 — guarantees (reliability hardening)
+Want to help? Items marked `help wanted` in the issue tracker are scoped
+starter tasks — see the [issue templates](.github/ISSUE_TEMPLATE) and open
+a PR. Security reports: follow [docs/SECURITY.md](docs/SECURITY.md).
+
+## Now — in flight
+
+- [ ] `@librepay/client` npm package (thin typed wrapper around API v1) — `help wanted`
+- [ ] Official Docker image + compose hardening guide — `help wanted`
+- [ ] Self-hosted payment links (static invoice URLs generated from the console)
+- [ ] External security review of the critical paths (webhook verification, SSRF guard, console auth)
+
+## P0 — guarantees (reliability hardening) ✅ shipped
 
 - [x] DB-queued webhooks, exponential backoff (1m→24h), dead-letter marking, signed HMAC, SSRF-guarded at delivery time
 - [x] Tor v3 deployment kit + `.onion` webhook destinations (`docs/DEPLOY_TOR.md`)
@@ -24,17 +37,15 @@ most effective) against BTCPay Server and custodial SaaS gateways.
 - [x] Shopify bridge (`integrations/shopify/`): manual-payment pattern fully automated — idempotent invoices, signed webhooks, orderMarkAsPaid, resume links
 - [x] `librepay.js` embed widget, copy-paste PHP/Node/Python examples
 - [ ] Shopify Plus checkout extension (uses the same node API)
-- [ ] PrestaShop / Drupal Commerce modules (community)
-- [ ] `@librepay/client` npm package (thin typed wrapper around API v1)
-- [ ] Self-hosted payment links (static invoice URLs generated from the console)
+- [ ] PrestaShop / Drupal Commerce modules (community) — `good first issue` scoping in progress
+- [ ] LNURL-pay descriptors, multi-LSP notes (phoenixd self-custody stays the default)
 
 ## P2 — power (operator experience)
 
 - [x] BTCPay-style console: password+TOTP, managed sessions, step-up, recovery links, live security monitor, privacy modes, encrypted at rest, encrypted backups (local + remote)
 - [x] Prometheus `/metrics` (v0.8.0): restart-safe gauges re-derived from SQLite — invoice lifecycle, outbox depth/dead-letters, chain provider health, db/process; scrape config + alert rules in docs/API.md
 - [ ] `bun run update` — one-command upgrade: backup → pull → migrate → restart
-- [ ] Official Docker image + compose hardening guide
-- [ ] Lightning: LNURL-pay descriptors, multi-LSP notes (phoenixd self-custody stays the default)
+- [ ] Console: per-invoice refund workflows surfaced in UI (API exists)
 
 ## What we will NOT do (on purpose)
 

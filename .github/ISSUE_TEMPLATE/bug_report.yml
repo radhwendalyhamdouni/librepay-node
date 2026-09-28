@@ -1,0 +1,60 @@
+name: Bug report
+description: Something in the node misbehaves — confirmations, webhooks, console, metrics.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for running LibrePay Node. Please fill this in — logs beat
+        descriptions. **Redact secrets**: never paste `lp_live_` keys, TOTP
+        seeds, zpub/xpub, payment codes or session cookies.
+  - type: input
+    id: version
+    attributes:
+      label: Node version
+      description: Output of the version shown in the console footer, or the release tag you installed.
+      placeholder: v0.8.1
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Invoice lifecycle (waiting/detected/confirmed/settled)
+        - Webhooks (delivery, signatures, retries, dead-letter)
+        - Console (login, TOTP, sessions, step-up)
+        - Chain watcher / Esplora / alarms
+        - Lightning (phoenixd)
+        - Metrics (/api/metrics)
+        - Backups / restore
+        - Install / setup wizard
+        - Integration (WooCommerce / Shopify / examples)
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect to happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs (redacted)
+      render: shell
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands or clicks, starting from a fresh state if possible.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Bun version, VPS provider, behind Tor/reverse proxy?
+      placeholder: Debian 12 · Bun 1.2.x · Hetzner CX22 · nginx + Let's Encrypt

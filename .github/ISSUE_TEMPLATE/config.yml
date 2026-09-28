@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability (responsible disclosure)
+    url: https://github.com/radhwendalyhamdouni/librepay-node/blob/main/docs/SECURITY.md
+    about: Please do NOT open a public issue for security reports — follow the disclosure policy instead.
+  - name: Documentation & self-hosting guide
+    url: https://github.com/radhwendalyhamdouni/librepay-node#readme
+    about: Install, Tor deployment, API reference and the honest risk model live in the README and docs/.

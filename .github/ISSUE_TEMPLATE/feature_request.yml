@@ -1,0 +1,51 @@
+name: Feature request
+description: Propose an improvement. Check docs/ROADMAP.md first — it may already be planned.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The roadmap lives at [docs/ROADMAP.md](https://github.com/radhwendalyhamdouni/librepay-node/blob/main/docs/ROADMAP.md)
+        and lists things we will NOT build on purpose (multi-tenant accounts,
+        KYC, hot wallets on the node). Requests contradicting those
+        principles will be closed, kindly.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What can you not do today? Concrete operator story beats abstract feature.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would you solve it? API shape, console flow, config surface?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - API / integrations
+        - Console UX
+        - Privacy (Tor, explorer links, checkout)
+        - Reliability (webhooks, confirmations, alarms)
+        - Ops (install, backups, updates, Docker)
+        - Docs
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Non-custodial principles
+      description: Confirm the feature keeps the node watch-only and self-hosted.
+      options:
+        - label: This feature does not require the node to hold spending keys or introduce a third-party runtime dependency.
+          required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
