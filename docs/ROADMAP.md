@@ -15,7 +15,8 @@ most effective) against BTCPay Server and custodial SaaS gateways.
 - [x] **Reorg-safe confirmations**: the ≥N-conf sighting must repeat on the next tick before `confirmed` fires; streak resets if confirmations drop
 - [x] **Manual redrive**: console button (or `POST /api/system/webhooks {"action":"redrive"}`) requeues dead webhook deliveries
 - [x] Settled-jump contract fix: confirmations that skip past the threshold emit `invoice.confirmed` AND `invoice.settled`, in order
-- [ ] Health self-probe: cron alerts (security log) if Esplora/phoenixd unreachable for N ticks
+- [x] **Health self-probe (v0.8.0)**: Esplora outage ALARM — 3 consecutive failures fire a signed `system.esplora_down` webhook (+ audit log), `system.esplora_up` on recovery with measured downtime, `system.esplora_stalled` for a frozen tip; while DOWN the cron probes once per tick instead of hammering the provider
+- [x] Outage-safe cron: a missing chain tip can no longer zero confirmation counters (payment metadata is never written without chain data; time-based expiry keeps running)
 
 ## P1 — reach (integration surface)
 
@@ -30,7 +31,7 @@ most effective) against BTCPay Server and custodial SaaS gateways.
 ## P2 — power (operator experience)
 
 - [x] BTCPay-style console: password+TOTP, managed sessions, step-up, recovery links, live security monitor, privacy modes, encrypted at rest, encrypted backups (local + remote)
-- [ ] Prometheus `/metrics` (invoice counters, webhook latency, cron tick age)
+- [x] Prometheus `/metrics` (v0.8.0): restart-safe gauges re-derived from SQLite — invoice lifecycle, outbox depth/dead-letters, chain provider health, db/process; scrape config + alert rules in docs/API.md
 - [ ] `bun run update` — one-command upgrade: backup → pull → migrate → restart
 - [ ] Official Docker image + compose hardening guide
 - [ ] Lightning: LNURL-pay descriptors, multi-LSP notes (phoenixd self-custody stays the default)

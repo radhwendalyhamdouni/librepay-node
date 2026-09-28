@@ -14,6 +14,7 @@
 import { db } from "@/lib/db";
 import { isWithinUnderpaymentTolerance } from "@/lib/bitcoin";
 import { getTipHeight, getAddressTxs, amountPaidToAddress, confirmationsOf, payerAddressOf, type EsploraTx } from "./esplora";
+import { isChainDown } from "./chain-health";
 import { enqueueWebhooks, processPendingDeliveries } from "./webhook";
 import { phoenixdGetIncoming, lightningPasswordOf } from "./lightning";
 import { notifyMerchant, notifyAdmins } from "./notify";
@@ -132,19 +133,34 @@ export async function transitionInvoice(
 
 /** One cron pass over open invoices. Returns summary. */
 export async function checkOpenInvoices(): Promise<{
-  checked: number; detected: number; confirmed: number; settled: number; expired: number; errors: number;
+  checked: number; detected: number; confirmed: number; settled: number; expired: number; errors: number; chainDown: boolean;
 }> {
+  // OUTAGE-AWARE: this tip probe doubles as the outage probe. While the
+  // provider is DOWN the whole pass costs exactly ONE HTTP call per tick —
+  // the moment it answers again, the full pass resumes on the same tick.
   const tip = await getTipHeight();
+  if (tip === null) {
+    // No chain data → NEVER touch payment metadata (a missing tip would
+    // zero every confirmation and reset reorg streaks — data regression).
+    // Time-based expiry below needs no chain data and stays correct: late
+    // payments still upgrade expired invoices via the existing path.
+    const summary = { checked: 0, detected: 0, confirmed: 0, settled: 0, expired: 0, errors: 1, chainDown: true };
+    await expireStaleInvoices(summary);
+    return summary;
+  }
   const open = await db.invoice.findMany({
     where: { status: { in: ["waiting", "detected", "confirmed"] } },
     orderBy: { createdAt: "asc" },
     take: 100,
   });
 
-  const summary = { checked: 0, detected: 0, confirmed: 0, settled: 0, expired: 0, errors: 0 };
+  const summary = { checked: 0, detected: 0, confirmed: 0, settled: 0, expired: 0, errors: 0, chainDown: false };
   const now = new Date();
 
   for (const inv of open) {
+    // provider fell mid-pass (address calls failing) — stop hammering it;
+    // the health monitor is already counting and will raise the alarm
+    if (isChainDown()) { summary.errors++; break; }
     summary.checked++;
     try {
       const txs = await getAddressTxs(inv.stealthAddress);
@@ -250,34 +266,41 @@ export async function checkOpenInvoices(): Promise<{
 
   // expire stale invoices that were never touched above (no API errors)
   // — fetch affected rows first so invoice.expired webhooks fire exactly once
+  await expireStaleInvoices(summary);
+
+  return summary;
+}
+
+/**
+ * Time-based expiry — safe to run even with NO chain data (needs nothing
+ * from the provider, so it keeps running during a full Esplora outage).
+ * One transaction per invoice: status + its webhook rows (outbox).
+ */
+async function expireStaleInvoices(summary: { expired: number }): Promise<void> {
   const staleRows = await db.invoice.findMany({
     where: { status: { in: ["waiting", "detected"] }, expiresAt: { lt: new Date() }, expiredNotified: false },
     take: 500,
   });
-  if (staleRows.length > 0) {
-    // outbox: expiry + its webhook rows in one transaction per invoice
-    for (const inv of staleRows) {
-      const ok = await db
-        .$transaction(async (tx) => {
-          const res = await tx.invoice.updateMany({
-            where: { id: inv.id, status: { in: ["waiting", "detected"] }, expiredNotified: false },
-            data: { status: "expired", expiredNotified: true },
-          });
-          if (res.count === 0) return false;
-          await enqueueWebhooks(tx, inv.merchantId, "invoice.expired", inv.id, {
-            invoice: publicInvoiceData({ ...inv, status: "expired", expiredNotified: true }),
-          });
-          return true;
-        })
-        .catch((err) => {
-          console.error("[expire-outbox]", inv.id, err);
-          return false;
+  if (staleRows.length === 0) return;
+  for (const inv of staleRows) {
+    const ok = await db
+      .$transaction(async (tx) => {
+        const res = await tx.invoice.updateMany({
+          where: { id: inv.id, status: { in: ["waiting", "detected"] }, expiredNotified: false },
+          data: { status: "expired", expiredNotified: true },
         });
-      if (ok) summary.expired++;
-    }
+        if (res.count === 0) return false;
+        await enqueueWebhooks(tx, inv.merchantId, "invoice.expired", inv.id, {
+          invoice: publicInvoiceData({ ...inv, status: "expired", expiredNotified: true }),
+        });
+        return true;
+      })
+      .catch((err) => {
+        console.error("[expire-outbox]", inv.id, err);
+        return false;
+      });
+    if (ok) summary.expired++;
   }
-
-  return summary;
 }
 
 /**

@@ -79,6 +79,26 @@ export const env = {
     return process.env.LP_LIGHTNING_PASSWORD ?? null;
   },
 
+  // ── chain outage alarm (self-monitoring) ──
+  /** Signed JSON POST target for system.esplora_down / _up / _stalled alarms */
+  get ALARM_WEBHOOK_URL() {
+    return process.env.LP_ALARM_WEBHOOK_URL ?? null;
+  },
+  /** Signature secret for the alarm POST (falls back to first WEBHOOK_SECRETS entry) */
+  get ALARM_WEBHOOK_SECRET() {
+    return process.env.LP_ALARM_WEBHOOK_SECRET ?? null;
+  },
+  /** Consecutive chain-API failures before the provider is declared DOWN */
+  get ESPLORA_FAIL_THRESHOLD() {
+    const n = Number(process.env.LP_ESPLORA_FAIL_THRESHOLD ?? 3);
+    return Number.isFinite(n) && n >= 1 ? Math.min(Math.floor(n), 20) : 3;
+  },
+  /** Minutes without a tip advance before system.esplora_stalled fires */
+  get TIP_STALL_MINUTES() {
+    const n = Number(process.env.LP_TIP_STALL_MINUTES ?? 90);
+    return Number.isFinite(n) && n >= 10 ? Math.floor(n) : 90;
+  },
+
   // ── infra ──
   get ESPLORA_API() {
     return process.env.ESPLORA_API ?? "https://mempool.space/api";

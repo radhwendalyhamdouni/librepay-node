@@ -70,6 +70,7 @@ the setup code self-destructs, and the node starts receiving Bitcoin.
 | 📡 **Signed webhooks** | HMAC-SHA256 over the raw body, timing-safe verification, 8 retries over ~24h. |
 | 🌍 **6-language checkout** | en · ar (RTL) · fr · es · pt · fil — detected from the buyer's browser. |
 | 🕐 **Self-watching** | Embedded chain watcher (Esplora) — no external cron needed. |
+| 🚨 **Self-monitoring (v0.8.0)** | Esplora outage ALARM: signed `system.esplora_down/_up/_stalled` webhook + Prometheus `/metrics` — a fallen chain provider can never fail silently. |
 | 🔐 **Strict API** | Zod-validated, rate-limited, `lp_live_` keys, SSRF-guarded outbound calls. |
 | 🏝 **Fully independent** | No platform behind it. No SaaS, no accounts, no phone-home. Every external touchpoint (chain data, explorer links, Lightning, webhooks) is configured by YOU and stays under YOUR control. |
 
@@ -174,10 +175,28 @@ or onion-only. One drop-in torrc, hardened systemd unit, cookie/webhook/explorer
 details: [docs/DEPLOY_TOR.md](docs/DEPLOY_TOR.md). Set `LP_ONION_URL` to
 auto-offer the mirror via `Onion-Location`.
 
+## Know when the chain falls (v0.8.0)
+
+The one dependency the node doesn't fully control is the chain-data provider.
+librepay-node watches the watcher:
+
+- **Alarm webhook** — `LP_ALARM_WEBHOOK_URL` gets one signed JSON POST on
+  `system.esplora_down` (after 3 consecutive failures), `system.esplora_up`
+  (with measured downtime) and `system.esplora_stalled` (frozen tip). Same
+  HMAC contract as payment webhooks — your existing receiver verifies it as-is.
+- **Prometheus** — `GET /api/metrics` (Bearer key or console cookie) exposes
+  `librepay_chain_provider_up`, outbox depth, dead letters, invoice lifecycle
+  and process health. Scrape config + ready-made alert rules:
+  [docs/API.md](docs/API.md) § Metrics.
+- **Outage-safe by construction** — while the provider is down the cron makes
+  one cheap probe per tick instead of hammering it, never writes payment
+  metadata without a tip, and keeps expiring invoices on schedule. Late
+  payments still revive expired invoices when the chain comes back.
+
 ## Where this is going
 
-Prioritized plan (idempotency keys, transactional outbox, reorg checks,
-metrics, one-command update): [docs/ROADMAP.md](docs/ROADMAP.md).
+Prioritized plan (Shopify Plus checkout, PrestaShop, npm client, one-command
+update, Docker): [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Status lifecycle
 

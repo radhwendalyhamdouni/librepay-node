@@ -12,6 +12,7 @@ import { authenticateConsole } from "@/lib/server/console-auth";
 import { getMerchant } from "@/lib/config";
 import { getSettings } from "@/lib/server/settings";
 import { backupStatus, listBackups } from "@/lib/server/backup";
+import { getChainHealth } from "@/lib/server/chain-health";
 import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -77,6 +78,7 @@ export async function GET(req: Request) {
     version: process.env.npm_package_version ?? "0.2.0",
     nodeEnv: process.env.NODE_ENV ?? "development",
     store: { name: me.name, brandColor: me.brandColor, logoUrl: me.logoUrl },
+    chain: getChainHealth(),
     wallet: {
       mode: me.walletMode,
       confirmationsRequired: me.confirmationsRequired,

@@ -116,6 +116,37 @@ the same event may arrive more than once.
 Events: `invoice.detected`, `invoice.confirmed`, `invoice.settled`,
 `invoice.expired`, `invoice.underpaid`.
 
+### Operator alarm webhook (`system.*` events)
+
+The node monitors its own chain dependency. When the Esplora provider falls,
+recovers, or its tip stalls, ONE signed JSON POST goes to `LP_ALARM_WEBHOOK_URL`
+(any HTTPS receiver that accepts JSON — ntfy topic, Slack `chat.postMessage`,
+Apprise bridge, or your own endpoint; loopback allowed in dev only). Envelope
+is the same contract as merchant webhooks — `examples/webhook-receiver-node.mjs`
+verifies these alarms verbatim:
+
+```json
+{ "event": "system.esplora_down", "severity": "critical",
+  "data": { "consecutiveFailures": 3, "lastError": "HTTP 503 on /blocks/tip/height",
+            "provider": "mempool.space", "text": "Chain data provider DOWN — …" },
+  "timestamp": 1790000000000 }
+```
+
+- `system.esplora_down` (critical) — N consecutive failures
+  (`LP_ESPLORA_FAIL_THRESHOLD`, default 3). Invoice detection pauses; expiry
+  keeps running and late payments still upgrade.
+- `system.esplora_up` (info) — recovery, with measured `downtimeSeconds`.
+- `system.esplora_stalled` (warn) — tip unchanged for `LP_TIP_STALL_MINUTES`
+  (default 90): the provider answers but its data is frozen (stale cache).
+
+Signature: `X-LibrePay-Signature` over the raw body using
+`LP_ALARM_WEBHOOK_SECRET` (falls back to the first `LP_WEBHOOK_SECRETS`
+entry). The POST is best-effort by design — the state flip is also durable in
+the security audit log (`chain_alarm`) and `/api/metrics` keeps
+`librepay_chain_provider_up` at 0 until recovery, so a missed POST cannot
+hide an outage from a scraping Prometheus. While DOWN the cron probes with a
+single lightweight call per tick instead of hammering the provider.
+
 ## Public checkout payload
 
 ```http
@@ -125,8 +156,58 @@ GET /api/public/invoice/:id        # no auth — powers the hosted checkout
 ## Health & cron
 
 ```http
-GET  /api/health                   # 200 {ok:true, db:true}
+GET  /api/health                   # 200 {ok:true, db:true, chain:{status,failures,…}}
 POST /api/cron/tick                # Bearer LP_CRON_SECRET — manual watch pass
+```
+
+`/api/health` is a liveness probe: the HTTP status only reflects the DATABASE.
+The `chain` block is informational — `chain.status: "down"` means payments
+cannot be *detected* (the node itself is alive), and the alarm webhook +
+metrics are the channels that scream about it.
+
+## Metrics (Prometheus)
+
+```http
+GET /api/metrics                   # console session cookie OR Bearer lp_live_ key
+```
+
+Prometheus text exposition (`text/plain; version=0.0.4`). Everything is
+re-derived from SQLite at scrape time, so gauges survive restarts and cannot
+lie after a reboot. Key series:
+
+| Metric | Alert when |
+|---|---|
+| `librepay_chain_provider_up` | `== 0 for 2m` — Esplora outage |
+| `librepay_chain_tip_stalled_minutes` | `> 90` — provider cache frozen |
+| `librepay_webhook_outbox_dead` | `> 0` — deliveries need redrive |
+| `librepay_db_up` | `== 0` — database gate |
+| `librepay_invoices{status=…}` / `librepay_invoice_sats_received_total` | business KPIs |
+| `librepay_webhook_outbox_due`, `librepay_chain_provider_latency_ms`, `librepay_process_uptime_seconds`, `librepay_db_size_bytes` | capacity |
+
+Scrape config:
+
+```yaml
+scrape_configs:
+  - job_name: librepay-node
+    metrics_path: /api/metrics
+    scheme: https
+    authorization:
+      credentials: lp_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    scrape_interval: 30s
+```
+
+Minimal alert rules:
+
+```yaml
+- alert: LibrepayChainProviderDown
+  expr: librepay_chain_provider_up == 0
+  for: 2m
+  labels: { severity: critical }
+  annotations: { summary: "Esplora outage — payment detection paused" }
+- alert: LibrepayWebhookDeadLetters
+  expr: librepay_webhook_outbox_dead > 0
+  for: 10m
+  labels: { severity: warning }
 ```
 
 ## Simulation (testing only)

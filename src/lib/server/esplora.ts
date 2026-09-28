@@ -5,6 +5,7 @@
  */
 
 import { env } from "@/lib/env";
+import { recordChainFailure, recordChainSuccess, recordTipHeight } from "./chain-health";
 
 export interface EsploraTxVout {
   scriptpubkey: string;
@@ -23,6 +24,7 @@ export interface EsploraTx {
 }
 
 async function get<T>(path: string, timeoutMs = 10_000): Promise<T | null> {
+  const started = Date.now();
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -32,9 +34,16 @@ async function get<T>(path: string, timeoutMs = 10_000): Promise<T | null> {
       cache: "no-store",
     });
     clearTimeout(timer);
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
+    if (!res.ok) {
+      // feeds the outage alarm: N consecutive failures ⇒ system.esplora_down
+      recordChainFailure(`HTTP ${res.status} on ${path}`);
+      return null;
+    }
+    const data = (await res.json()) as T;
+    recordChainSuccess(Date.now() - started);
+    return data;
+  } catch (err) {
+    recordChainFailure(err instanceof Error ? err.message : "network error");
     return null;
   }
 }
@@ -44,9 +53,11 @@ export async function getAddressTxs(address: string): Promise<EsploraTx[] | null
   return get<EsploraTx[]>(`/address/${encodeURIComponent(address)}/txs`);
 }
 
-/** Current chain tip height. */
+/** Current chain tip height. Also feeds tip-stall detection in the health monitor. */
 export async function getTipHeight(): Promise<number | null> {
-  return get<number>("/blocks/tip/height");
+  const height = await get<number>("/blocks/tip/height");
+  if (typeof height === "number") recordTipHeight(height);
+  return height;
 }
 
 /** Fiat rates: { time, USD, EUR, ... } — sats price per fiat unit *100? No: returns fiat per BTC. */

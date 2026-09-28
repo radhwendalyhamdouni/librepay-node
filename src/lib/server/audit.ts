@@ -30,6 +30,8 @@ export const SecurityEventType = {
   LIGHTNING_UPDATED: "lightning_updated",
   SETUP_COMPLETED: "setup_completed",
   DELIVERY_DEAD: "delivery_dead",
+  // chain provider self-monitoring (Esplora outage alarm) — v0.8.0
+  CHAIN_ALARM: "chain_alarm",
   // console (human) auth — v0.5.0
   CONSOLE_LOGIN: "console_login",
   CONSOLE_LOGOUT: "console_logout",

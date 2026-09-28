@@ -1,6 +1,6 @@
 {
   "name": "librepay-node",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": false,
   "description": "Self-hosted, non-custodial Bitcoin payment gateway \u2014 on-chain stealth addresses + instant Lightning (phoenixd). No accounts. No KYC. AGPL-3.0.",
   "homepage": "https://github.com/radhwendalyhamdouni/librepay-node#readme",
