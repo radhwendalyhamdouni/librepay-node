@@ -129,7 +129,7 @@ export async function POST(req: Request) {
         detail: e instanceof Error ? e.message : "derivation failed",
         hint:
           b.wallet.kind === "paymentcode"
-            ? "a BIP47 payment code starts with PM8T and is 67 characters"
+            ? "a LibrePay payment code is 103 characters and starts with 6bv5 (from your wallet derivation or scripts/setup.ts)"
             : hrp === "tb"
               ? "on this testnet node paste a vpub (BIP84 testnet, from a testnet wallet) — zpub/xpub are mainnet keys"
               : "a BIP84 zpub starts with zpub (or xpub) — check for typos and that it is the account-level key",

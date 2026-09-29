@@ -29,7 +29,7 @@ export const env = {
   },
 
   // ── wallet (choose ONE rail; both can coexist) ──
-  /** BIP47 payment code (PM8T…) → per-invoice stealth addresses */
+  /** LibrePay payment code (6bv5…) → per-invoice stealth addresses */
   get PAYMENT_CODE() {
     return process.env.LP_PAYMENT_CODE ?? null;
   },
